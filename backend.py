@@ -1916,15 +1916,25 @@ def receive_command_result(command_id):
         success = result.get("success", True) if isinstance(result, dict) else True
         store_result(device_id, command_id, result, success=success)
 
-        if isinstance(result, dict) and result.get("image_base64"):
-            media_type = result.get("type") or "screenshot"
-            screenshots_col.insert_one({
-                "device_id": device_id,
-                "command_id": command_id,
-                "media_type": media_type,
-                "image_base64": result.get("image_base64"),
-                "created_at": datetime.now()
-            })
+        if isinstance(result, dict):
+            media_type = result.get("type")
+            if result.get("image_base64"):
+                screenshots_col.insert_one({
+                    "device_id": device_id,
+                    "command_id": command_id,
+                    "media_type": media_type or "screenshot",
+                    "image_base64": result.get("image_base64"),
+                    "created_at": datetime.now()
+                })
+            if result.get("video_base64"):
+                screenshots_col.insert_one({
+                    "device_id": device_id,
+                    "command_id": command_id,
+                    "media_type": media_type or "record",
+                    "video_base64": result.get("video_base64"),
+                    "mime_type": result.get("mime_type", "video/mp4"),
+                    "created_at": datetime.now()
+                })
 
     return jsonify({"status": "success"})
 
@@ -2021,6 +2031,8 @@ def get_latest_media(device_id):
 
     return jsonify({
         "image_base64": doc.get("image_base64"),
+        "video_base64": doc.get("video_base64"),
+        "mime_type": doc.get("mime_type"),
         "media_type": doc.get("media_type"),
         "created_at": str(doc.get("created_at", ""))
     })

