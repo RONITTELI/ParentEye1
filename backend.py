@@ -7,19 +7,12 @@ from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 import requests
-import psutil
 import platform
 import socket
-import pyautogui
-import cv2
-import mss
 import time
 import threading
 import base64
 from io import BytesIO
-from PIL import Image
-import numpy as np
-import imageio
 import sqlite3
 from bson import ObjectId
 import secrets
