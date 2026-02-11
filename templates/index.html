@@ -972,13 +972,13 @@
                 if (data.status === 'success' || data.status === 'queued') {
                     if (['screenshot', 'webcam'].includes(command)) {
                         output.innerHTML = '🕒 Command queued. Waiting for media...';
-                        pollMedia(command, 10);
+                        pollMedia(command, 40);
                     } else if (command === 'chromehistory') {
                         output.innerHTML = '🕒 Command queued. Waiting for history...';
-                        pollHistory(10);
+                        pollHistory(40);
                     } else {
                         output.innerHTML = '🕒 Command queued. Waiting for result...';
-                        pollResult(command, 10);
+                        pollResult(command, 40);
                     }
                 } else {
                     output.innerHTML = '❌ Error: ' + (data.error || data.message || 'Unknown error');
@@ -1083,7 +1083,7 @@
                     const output = document.getElementById('output');
                     output.style.display = 'block';
                     output.innerHTML = '🕒 Record command queued. Waiting for video...';
-                    pollMedia('record', 10);
+                    pollMedia('record', 40);
                 });
             }
         }
