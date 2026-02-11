@@ -1,0 +1,9 @@
+# Backend Server Requirements (for deployment)
+# These are the minimum packages needed to run backend.py on a server
+
+flask>=3.0.0
+pymongo>=4.6.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+opencv-python>=4.8.0
+psutil>=5.9.0

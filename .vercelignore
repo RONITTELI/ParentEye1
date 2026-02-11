@@ -9,5 +9,6 @@ config_client.py
 *.bat
 *.vbs
 requirements-client.txt
+requirements-full.txt
 DEPLOYMENT.md
 README.md
