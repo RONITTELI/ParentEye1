@@ -2538,5 +2538,6 @@ if __name__ == '__main__':
     print(f"[{datetime.now().isoformat()}] 👁️  Parent dashboard: http://localhost:5000/")
     print(f"[{datetime.now().isoformat()}] 📝 Logging all operations to console with timestamps")
     print("="*60 + "\n")
-    
+
+if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
