@@ -79,6 +79,7 @@ def check_logged_in():
         '/api/register-device',
         '/api/commands/pending',
         '/api/command/executed',
+        '/api/command/result',
         '/api/device/claim-code',
         '/api/send-location',
         '/api/send-browser-history',
