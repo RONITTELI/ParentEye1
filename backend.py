@@ -1656,15 +1656,8 @@ def cmd_lock():
         return jsonify({"error": "Unauthorized: You don't have access to this device"}), 403
     
     command_id = store_command(device_id, "lock")
-    try:
-        os.system("rundll32.exe user32.dll,LockWorkStation")
-        store_result(device_id, command_id, "PC locked successfully")
-        print(f"[{datetime.now().isoformat()}] 🔒 PC locked command executed for device: {device_id}")
-        return jsonify({"status": "success", "message": "PC locked"})
-    except Exception as e:
-        store_result(device_id, command_id, str(e), success=False)
-        print(f"[{datetime.now().isoformat()}] ❌ Lock command failed for device {device_id}: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 400
+    print(f"[{datetime.now().isoformat()}] 📤 Lock command queued for device: {device_id} (ID: {command_id})")
+    return jsonify({"status": "queued", "command_id": command_id})
 
 @app.route('/api/command/shutdown', methods=['POST'])
 def cmd_shutdown():
@@ -1673,15 +1666,8 @@ def cmd_shutdown():
     device_id = data.get('device_id')
     
     command_id = store_command(device_id, "shutdown")
-    try:
-        os.system("shutdown /s /t 10")
-        store_result(device_id, command_id, "Shutdown initiated")
-        print(f"[{datetime.now().isoformat()}] 🛑 PC shutdown command executed for device: {device_id}")
-        return jsonify({"status": "success", "message": "Shutdown initiated"})
-    except Exception as e:
-        store_result(device_id, command_id, str(e), success=False)
-        print(f"[{datetime.now().isoformat()}] ❌ Shutdown command failed for device {device_id}: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 400
+    print(f"[{datetime.now().isoformat()}] 📤 Shutdown command queued for device: {device_id} (ID: {command_id})")
+    return jsonify({"status": "queued", "command_id": command_id})
 
 @app.route('/api/command/restart', methods=['POST'])
 def cmd_restart():
@@ -1690,15 +1676,8 @@ def cmd_restart():
     device_id = data.get('device_id')
     
     command_id = store_command(device_id, "restart")
-    try:
-        os.system("shutdown /r /t 10")
-        store_result(device_id, command_id, "Restart initiated")
-        print(f"[{datetime.now().isoformat()}] 🔄 PC restart command executed for device: {device_id}")
-        return jsonify({"status": "success", "message": "Restart initiated"})
-    except Exception as e:
-        store_result(device_id, command_id, str(e), success=False)
-        print(f"[{datetime.now().isoformat()}] ❌ Restart command failed for device {device_id}: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 400
+    print(f"[{datetime.now().isoformat()}] 📤 Restart command queued for device: {device_id} (ID: {command_id})")
+    return jsonify({"status": "queued", "command_id": command_id})
 
 @app.route('/api/command/logout', methods=['POST'])
 def cmd_logout():
@@ -1707,15 +1686,8 @@ def cmd_logout():
     device_id = data.get('device_id')
     
     command_id = store_command(device_id, "logout")
-    try:
-        os.system("shutdown -l")
-        store_result(device_id, command_id, "Logout initiated")
-        print(f"[{datetime.now().isoformat()}] 👤 Logout command executed for device: {device_id}")
-        return jsonify({"status": "success", "message": "Logout initiated"})
-    except Exception as e:
-        store_result(device_id, command_id, str(e), success=False)
-        print(f"[{datetime.now().isoformat()}] ❌ Logout command failed for device {device_id}: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 400
+    print(f"[{datetime.now().isoformat()}] 📤 Logout command queued for device: {device_id} (ID: {command_id})")
+    return jsonify({"status": "queued", "command_id": command_id})
 
 # Generic command router
 @app.route('/api/command/execute', methods=['POST'])
@@ -1738,7 +1710,8 @@ def execute_command():
     # Valid commands
     valid_commands = [
         'lock', 'shutdown', 'restart', 'logout', 
-        'screenshot', 'webcam', 'chromehistory', 
+        'screenshot', 'webcam', 'chromehistory', 'record',
+        'keystrokes_start', 'keystrokes_stop',
         'popup_alert', 'block_site', 'unblock_site',
         'block_app', 'unblock_app', 'time_restriction'
     ]
@@ -1768,32 +1741,8 @@ def cmd_screenshot():
         return jsonify({"error": "Unauthorized: You don't have access to this device"}), 403
     
     command_id = store_command(device_id, "screenshot")
-    try:
-        screenshot = pyautogui.screenshot()
-        
-        # Convert to base64 for storage
-        img_byte_arr = BytesIO()
-        screenshot.save(img_byte_arr, format='PNG')
-        img_byte_arr = img_byte_arr.getvalue()
-        img_base64 = base64.b64encode(img_byte_arr).decode('utf-8')
-        
-        # Store screenshot in MongoDB
-        screenshot_doc = {
-            "device_id": device_id,
-            "command_id": command_id,
-            "image_base64": img_base64,
-            "created_at": datetime.now()
-        }
-        screenshots_col.insert_one(screenshot_doc)
-        
-        store_result(device_id, command_id, "Screenshot captured")
-        print(f"[{datetime.now().isoformat()}] 📸 Screenshot captured for device: {device_id}")
-        
-        return jsonify({"status": "success", "image": img_base64})
-    except Exception as e:
-        store_result(device_id, command_id, str(e), success=False)
-        print(f"[{datetime.now().isoformat()}] ❌ Screenshot failed for device {device_id}: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 400
+    print(f"[{datetime.now().isoformat()}] 📤 Screenshot command queued for device: {device_id} (ID: {command_id})")
+    return jsonify({"status": "queued", "command_id": command_id})
 
 @app.route('/api/command/webcam', methods=['POST'])
 def cmd_webcam():
@@ -1802,31 +1751,8 @@ def cmd_webcam():
     device_id = data.get('device_id')
     
     command_id = store_command(device_id, "webcam")
-    try:
-        cap = cv2.VideoCapture(0)
-        ret, frame = cap.read()
-        cap.release()
-        
-        if ret:
-            # Convert BGR to RGB
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            # Convert to base64
-            _, img_encoded = cv2.imencode('.jpg', frame)
-            img_base64 = base64.b64encode(img_encoded.tobytes()).decode('utf-8')
-            
-            store_result(device_id, command_id, "Webcam captured")
-            print(f"[{datetime.now().isoformat()}] 📷 Webcam captured for device: {device_id}")
-            
-            return jsonify({"status": "success", "image": img_base64})
-        else:
-            store_result(device_id, command_id, "Unable to capture webcam", success=False)
-            print(f"[{datetime.now().isoformat()}] ❌ Webcam not available for device: {device_id}")
-            return jsonify({"status": "error", "message": "Unable to capture webcam"}), 400
-    except Exception as e:
-        store_result(device_id, command_id, str(e), success=False)
-        print(f"[{datetime.now().isoformat()}] ❌ Webcam capture failed for device {device_id}: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 400
+    print(f"[{datetime.now().isoformat()}] 📤 Webcam command queued for device: {device_id} (ID: {command_id})")
+    return jsonify({"status": "queued", "command_id": command_id})
 
 @app.route('/api/command/chromehistory', methods=['POST'])
 def cmd_chrome_history():
@@ -1835,37 +1761,8 @@ def cmd_chrome_history():
     device_id = data.get('device_id')
     
     command_id = store_command(device_id, "chromehistory")
-    try:
-        chrome_history_path = os.path.expanduser("~") + r"\AppData\Local\Google\Chrome\User Data\Default\History"
-        temp_history_db = "temp_chrome_history.db"
-        
-        # Copy the locked DB file
-        os.system(f'copy "{chrome_history_path}" "{temp_history_db}"')
-        
-        conn = sqlite3.connect(temp_history_db)
-        cursor = conn.cursor()
-        cursor.execute("SELECT url, title FROM urls ORDER BY last_visit_time DESC LIMIT 20")
-        history = cursor.fetchall()
-        conn.close()
-        os.remove(temp_history_db)
-        
-        # Format history with timestamps
-        history_data = []
-        for url, title in history:
-            history_data.append({
-                "url": url,
-                "title": title,
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        store_result(device_id, command_id, "Chrome history retrieved")
-        print(f"[{datetime.now().isoformat()}] 🌐 Chrome history retrieved for device: {device_id} ({len(history_data)} items)")
-        
-        return jsonify({"status": "success", "history": history_data})
-    except Exception as e:
-        store_result(device_id, command_id, str(e), success=False)
-        print(f"[{datetime.now().isoformat()}] ❌ Chrome history failed for device {device_id}: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 400
+    print(f"[{datetime.now().isoformat()}] 📤 Chrome history command queued for device: {device_id} (ID: {command_id})")
+    return jsonify({"status": "queued", "command_id": command_id})
 
 @app.route('/api/command/record', methods=['POST'])
 def cmd_record():
@@ -1875,27 +1772,8 @@ def cmd_record():
     duration = data.get('duration', 10)
     
     command_id = store_command(device_id, "record", {"duration": duration})
-    try:
-        frames = []
-        with mss.mss() as sct:
-            start_time = time.time()
-            while time.time() - start_time < duration:
-                screenshot = sct.grab(sct.monitors[1])
-                frame = np.array(screenshot)
-                frames.append(frame)
-                time.sleep(0.1)
-        
-        output = "screen_record.mp4"
-        imageio.mimsave(output, frames, fps=10)
-        
-        store_result(device_id, command_id, f"Screen recorded for {duration} seconds")
-        print(f"[{datetime.now().isoformat()}] 🎬 Screen recording completed for device: {device_id} ({duration}s)")
-        
-        return send_file(output, mimetype='video/mp4', as_attachment=True)
-    except Exception as e:
-        store_result(device_id, command_id, str(e), success=False)
-        print(f"[{datetime.now().isoformat()}] ❌ Screen recording failed for device {device_id}: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 400
+    print(f"[{datetime.now().isoformat()}] 📤 Record command queued for device: {device_id} (ID: {command_id})")
+    return jsonify({"status": "queued", "command_id": command_id})
 
 @app.route('/api/screenshots/<device_id>', methods=['GET'])
 @login_required
@@ -1907,7 +1785,13 @@ def get_screenshots(device_id):
         return jsonify({"error": "Unauthorized: You don't have access to this device"}), 403
     
     screenshots = list(screenshots_col.find(
-        {"device_id": device_id},
+        {
+            "device_id": device_id,
+            "$or": [
+                {"media_type": "screenshot"},
+                {"media_type": {"$exists": False}}
+            ]
+        },
         sort=[("created_at", -1)],
         limit=20
     ))
@@ -2016,14 +1900,31 @@ def cmd_fetch_location():
 @app.route('/api/command/result/<command_id>', methods=['POST'])
 def receive_command_result(command_id):
     """Receive result from client"""
-    data = request.json
+    data = request.json or {}
     result = data.get('result', {})
-    
+
+    command_doc = commands_col.find_one({"_id": ObjectId(command_id)}) or {}
+    device_id = command_doc.get("device_id")
+
     commands_col.update_one(
         {"_id": ObjectId(command_id)},
-        {"$set": {"result": result, "status": "completed"}}
+        {"$set": {"result": result, "status": "completed", "result_received_at": datetime.now()}}
     )
-    
+
+    if device_id:
+        success = result.get("success", True) if isinstance(result, dict) else True
+        store_result(device_id, command_id, result, success=success)
+
+        if isinstance(result, dict) and result.get("image_base64"):
+            media_type = result.get("type") or "screenshot"
+            screenshots_col.insert_one({
+                "device_id": device_id,
+                "command_id": command_id,
+                "media_type": media_type,
+                "image_base64": result.get("image_base64"),
+                "created_at": datetime.now()
+            })
+
     return jsonify({"status": "success"})
 
 @app.route('/api/command/executed/<command_id>', methods=['POST'])
@@ -2065,21 +1966,91 @@ def get_browser_history(device_id):
     if not verify_device_access(device_id):
         print(f"[{datetime.now().isoformat()}] ⚠️ Unauthorized access attempt to device: {device_id} by user: {session.get('user_id')}")
         return jsonify({"error": "Unauthorized: You don't have access to this device"}), 403
-    
-    results = list(results_col.find(
-        {"device_id": device_id, "result": {"$ne": None}}
-    ).sort("created_at", -1).limit(50))
-    
+
     history = []
-    for r in results:
-        # Include result data with timestamp
-        history_item = r.get('result') if isinstance(r.get('result'), dict) else {"title": str(r.get('result', ''))}
-        history_item["created_at"] = str(r.get("created_at", ""))
-        history_item["success"] = r.get("success", True)
-        history.append(history_item)
-    
+    history_docs = list(db["browser_history"].find(
+        {"device_id": device_id}
+    ).sort("created_at", -1).limit(50))
+
+    for doc in history_docs:
+        history.append({
+            "url": doc.get("url"),
+            "title": doc.get("title"),
+            "visited_at": doc.get("visited_at"),
+            "browser": doc.get("browser"),
+            "created_at": str(doc.get("created_at", ""))
+        })
+
+    if not history:
+        cmd_doc = commands_col.find_one(
+            {"device_id": device_id, "command": "chromehistory", "result": {"$ne": None}},
+            sort=[("result_received_at", -1), ("created_at", -1)]
+        )
+        if cmd_doc and isinstance(cmd_doc.get("result"), dict):
+            data = cmd_doc.get("result", {}).get("data") or []
+            for entry in data:
+                if isinstance(entry, dict):
+                    history.append({
+                        "url": entry.get("url"),
+                        "title": entry.get("title"),
+                        "visited_at": entry.get("visited_at"),
+                        "browser": entry.get("browser"),
+                        "created_at": str(cmd_doc.get("result_received_at") or cmd_doc.get("created_at", ""))
+                    })
+
     print(f"[{datetime.now().isoformat()}] 📜 Browser history retrieved for device: {device_id} ({len(history)} entries)")
     return jsonify(history)
+
+@app.route('/api/media/<device_id>', methods=['GET'])
+@login_required
+def get_latest_media(device_id):
+    """Get latest screenshot/webcam image for a device"""
+    if not verify_device_access(device_id):
+        print(f"[{datetime.now().isoformat()}] ⚠️ Unauthorized media access attempt: {device_id} by user: {session.get('user_id')}")
+        return jsonify({"error": "Unauthorized: You don't have access to this device"}), 403
+
+    media_type = request.args.get("type", "screenshot")
+    doc = screenshots_col.find_one(
+        {"device_id": device_id, "media_type": media_type},
+        sort=[("created_at", -1)]
+    )
+
+    if not doc:
+        return jsonify({})
+
+    return jsonify({
+        "image_base64": doc.get("image_base64"),
+        "media_type": doc.get("media_type"),
+        "created_at": str(doc.get("created_at", ""))
+    })
+
+@app.route('/api/results/<device_id>', methods=['GET'])
+@login_required
+def get_latest_result(device_id):
+    """Get latest result for a command on a device"""
+    if not verify_device_access(device_id):
+        print(f"[{datetime.now().isoformat()}] ⚠️ Unauthorized results access attempt: {device_id} by user: {session.get('user_id')}")
+        return jsonify({"error": "Unauthorized: You don't have access to this device"}), 403
+
+    command = request.args.get("command")
+    if not command:
+        return jsonify({"error": "Missing command"}), 400
+
+    cmd_doc = commands_col.find_one(
+        {"device_id": device_id, "command": command, "result": {"$ne": None}},
+        sort=[("result_received_at", -1), ("created_at", -1)]
+    )
+
+    if not cmd_doc:
+        return jsonify({})
+
+    result = cmd_doc.get("result")
+    success = result.get("success", True) if isinstance(result, dict) else True
+    return jsonify({
+        "success": success,
+        "data": result,
+        "created_at": str(cmd_doc.get("result_received_at") or cmd_doc.get("created_at", ""))
+    })
 
 @app.route('/api/time-restrictions/<device_id>', methods=['GET'])
 @login_required

