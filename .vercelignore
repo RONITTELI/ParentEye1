@@ -8,3 +8,6 @@ client.py
 config_client.py
 *.bat
 *.vbs
+requirements-client.txt
+DEPLOYMENT.md
+README.md

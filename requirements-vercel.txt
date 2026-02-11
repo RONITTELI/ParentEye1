@@ -1,0 +1,8 @@
+# Minimal backend requirements for Vercel deployment
+# Optimized to stay under 250 MB serverless limit
+
+flask==3.0.0
+pymongo==4.6.0
+requests==2.31.0
+python-dotenv==1.0.0
+psutil==5.9.0
