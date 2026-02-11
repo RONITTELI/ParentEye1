@@ -1112,20 +1112,32 @@ ADMIN_PANEL_HTML = '''
 def get_pc_info():
     """Fetch system information"""
     uname = platform.uname()
-    cpu_usage = psutil.cpu_percent(interval=1)
-    ram = psutil.virtual_memory()
-    disk = psutil.disk_usage('/')
     ip_address = socket.gethostbyname(socket.gethostname())
+    try:
+        import psutil
+        cpu_usage = psutil.cpu_percent(interval=1)
+        ram = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        ram_used = ram.used // (1024 ** 2)
+        ram_total = ram.total // (1024 ** 2)
+        disk_used = disk.used // (1024 ** 3)
+        disk_total = disk.total // (1024 ** 3)
+    except Exception:
+        cpu_usage = 0
+        ram_used = 0
+        ram_total = 0
+        disk_used = 0
+        disk_total = 0
 
     pc_info = {
         "system": f"{uname.system} {uname.release}",
         "machine": uname.machine,
         "processor": uname.processor,
         "cpu_usage": cpu_usage,
-        "ram_used": ram.used // (1024 ** 2),
-        "ram_total": ram.total // (1024 ** 2),
-        "disk_used": disk.used // (1024 ** 3),
-        "disk_total": disk.total // (1024 ** 3),
+        "ram_used": ram_used,
+        "ram_total": ram_total,
+        "disk_used": disk_used,
+        "disk_total": disk_total,
         "ip_address": ip_address
     }
     return pc_info
