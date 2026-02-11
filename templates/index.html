@@ -109,6 +109,23 @@
             font-weight: 600;
         }
 
+        .claim-box {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+
+        .claim-status {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #475569;
+        }
+
         .devices-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -321,6 +338,22 @@
             overflow-y: auto;
         }
 
+        .ai-summary-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .ai-summary-meta {
+            color: #64748b;
+            font-size: 11px;
+            margin-bottom: 8px;
+        }
+
         .history-item {
             padding: 12px 15px;
             border-left: 4px solid #667eea;
@@ -454,6 +487,11 @@
 
         <div class="devices-section">
             <h2>📱 Connected Devices</h2>
+            <div class="claim-box">
+                <input type="text" id="claim-code-input" placeholder="Enter device claim code" style="flex: 1;" />
+                <button class="btn-primary" onclick="claimDevice()">🔑 Claim Device</button>
+            </div>
+            <div id="claim-status" class="claim-status"></div>
             <div class="devices-grid" id="devicesGrid">
                 <div class="device-card" style="background: #667eea;">
                     <div class="loader" style="color: white;"></div>
@@ -478,6 +516,9 @@
                     <button class="tab-btn" onclick="switchTab('screenshots')">Screenshots</button>
                     <button class="tab-btn" onclick="switchTab('keystrokes')">Keystrokes</button>
                     <button class="tab-btn" onclick="switchTab('history')">History</button>
+                    <button class="tab-btn" onclick="switchTab('ai-summary')">AI Summary</button>
+                    <button class="tab-btn" onclick="switchTab('daily-report')">Daily Report</button>
+                    <button class="tab-btn" onclick="switchTab('website-blocking')">🚫 Website Blocking</button>
                     <button class="tab-btn" onclick="switchTab('command-history')">Command Log</button>
                 </div>
 
@@ -658,6 +699,51 @@
                     <div id="history-container" class="history-list"></div>
                 </div>
 
+                <!-- AI Summary Tab -->
+                <div id="ai-summary" class="tab-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="color: #333; margin: 0;">🧠 AI Daily Summary</h3>
+                        <button class="btn-success" onclick="loadAiSummary(true)" style="padding: 8px 12px; font-size: 12px;">🔄 Refresh</button>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                        <input type="date" id="ai-summary-date" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px;" />
+                        <button class="btn-primary" onclick="loadAiSummary(true)">🧠 Generate</button>
+                    </div>
+                    <div id="ai-summary-status" class="alert alert-info" style="display: none;"></div>
+                    <div id="ai-summary-output" class="ai-summary-box">Select a date and click Generate to get a summary.</div>
+                </div>
+
+                <!-- Daily Report Tab -->
+                <div id="daily-report" class="tab-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="color: #333; margin: 0;">📋 Daily Report (Raw Data)</h3>
+                        <button class="btn-success" onclick="loadDailyReport()" style="padding: 8px 12px; font-size: 12px;">🔄 Refresh</button>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                        <input type="date" id="daily-report-date" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px;" />
+                        <button class="btn-primary" onclick="loadDailyReport()">📥 Load</button>
+                    </div>
+                    <div id="daily-report-status" class="alert alert-info" style="display: none;"></div>
+                    <div style="display: grid; gap: 12px;">
+                        <div>
+                            <h4 style="margin-bottom: 6px; color: #333;">⌨️ Keystrokes</h4>
+                            <div id="daily-report-keystrokes" class="history-list"></div>
+                        </div>
+                        <div>
+                            <h4 style="margin-bottom: 6px; color: #333;">🌐 Website Visits</h4>
+                            <div id="daily-report-history" class="history-list"></div>
+                        </div>
+                        <div>
+                            <h4 style="margin-bottom: 6px; color: #333;">🧩 App Usage</h4>
+                            <div id="daily-report-apps" class="history-list"></div>
+                        </div>
+                        <div>
+                            <h4 style="margin-bottom: 6px; color: #333;">🕒 Browser Time</h4>
+                            <div id="daily-report-browser" class="history-list"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Command History Tab -->
                 <div id="command-history" class="tab-content">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -666,6 +752,51 @@
                     </div>
                     <p style="color: #6b7280; font-size: 13px; margin-bottom: 15px;">📋 Complete history of all commands sent to this device</p>
                     <div id="command-history-container" style="background: white; border-radius: 5px; padding: 10px; max-height: 500px; overflow-y: auto;"></div>
+                </div>
+
+                <!-- Website Blocking Tab -->
+                <div id="website-blocking" class="tab-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="color: #333; margin: 0;">🚫 Website Blocking (No Admin Required)</h3>
+                        <button class="btn-success" onclick="loadBlockedWebsites()" style="padding: 8px 12px; font-size: 12px;">🔄 Refresh</button>
+                    </div>
+                    
+                    <div style="background: #dbeafe; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 3px solid #3b82f6;">
+                        <p style="margin: 0; font-size: 13px; color: #1e40af;">
+                            ℹ️ <strong>How it works:</strong> Blocks websites in Chrome and Edge using browser policies. No admin privileges needed!
+                        </p>
+                    </div>
+
+                    <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 3px solid #f59e0b;">
+                        <p style="margin: 0 0 8px 0; font-size: 13px; color: #92400e;">
+                            ⚠️ <strong>Important Steps:</strong>
+                        </p>
+                        <ol style="margin: 0; padding-left: 20px; font-size: 12px; color: #92400e;">
+                            <li>Client must be running on child's computer</li>
+                            <li>Add websites to block below</li>
+                            <li><strong>RESTART Chrome or Edge browser</strong> for changes to take effect</li>
+                        </ol>
+                    </div>
+
+                    <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <h4 style="margin-bottom: 12px; color: #333;">➕ Add Website to Block</h4>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="text" id="block-url-input" placeholder="e.g., facebook.com, *.youtube.com, example.com" 
+                                style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 5px; font-size: 14px;" />
+                            <button class="btn-danger" onclick="addBlockedWebsite()" style="padding: 10px 20px; white-space: nowrap;">🚫 Block Website</button>
+                        </div>
+                        <div style="margin-top: 8px; font-size: 12px; color: #6b7280;">
+                            💡 <strong>Examples:</strong> facebook.com, *.youtube.com (blocks all YouTube), gaming.com<br>
+                            📝 Wildcard patterns supported: Use *.domain.com to block all subdomains
+                        </div>
+                    </div>
+
+                    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <h4 style="margin-bottom: 12px; color: #333;">📋 Currently Blocked Websites</h4>
+                        <div id="blocked-websites-list" style="max-height: 400px; overflow-y: auto;">
+                            <p style="color: #9ca3af; text-align: center; padding: 20px;">Loading...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -740,17 +871,66 @@
                 .catch(err => console.error('Error loading devices:', err));
         }
 
+        function claimDevice() {
+            const input = document.getElementById('claim-code-input');
+            const status = document.getElementById('claim-status');
+            const code = (input.value || '').trim();
+
+            if (!code) {
+                status.textContent = '⚠️ Please enter a claim code.';
+                return;
+            }
+
+            status.textContent = '⏳ Claiming device...';
+
+            fetch('/api/parent/claim-device', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ claim_code: code })
+            })
+            .then(res => res.json().then(data => ({ ok: res.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok) {
+                    status.textContent = `❌ ${data.error || 'Claim failed'}`;
+                    return;
+                }
+                status.textContent = `✅ Device claimed: ${data.device_name || data.device_id}`;
+                input.value = '';
+                loadDevices();
+            })
+            .catch(err => {
+                status.textContent = `❌ ${err.message}`;
+            });
+        }
+
         function selectDevice(deviceId, deviceName) {
             selectedDevice = deviceId;
             document.getElementById('selected-device-name').textContent = deviceName;
             document.getElementById('device-not-selected').style.display = 'none';
             document.getElementById('controls-container').style.display = 'block';
+
+            const summaryOutput = document.getElementById('ai-summary-output');
+            const summaryStatus = document.getElementById('ai-summary-status');
+            if (summaryOutput) {
+                summaryOutput.textContent = 'Select a date and click Generate to get a summary.';
+            }
+            if (summaryStatus) {
+                summaryStatus.style.display = 'none';
+                summaryStatus.textContent = '';
+            }
+
+            const reportStatus = document.getElementById('daily-report-status');
+            if (reportStatus) {
+                reportStatus.style.display = 'none';
+                reportStatus.textContent = '';
+            }
             
             // Load device info and data
             loadPCInfo();
             loadScreenshots();
             loadKeystrokes();
             loadHistory();
+            loadBlockedWebsites();
         }
 
         function loadPCInfo() {
@@ -931,6 +1111,135 @@
                 })
                 .catch(error => {
                     console.debug('History load error (expected when no data):', error);
+                });
+        }
+
+        function loadAiSummary(forceRefresh) {
+            if (!selectedDevice) {
+                alert('⚠️ Please select a device first');
+                return;
+            }
+
+            const dateInput = document.getElementById('ai-summary-date');
+            const output = document.getElementById('ai-summary-output');
+            const status = document.getElementById('ai-summary-status');
+
+            if (!dateInput.value) {
+                dateInput.value = new Date().toISOString().split('T')[0];
+            }
+
+            const refreshParam = forceRefresh ? '&refresh=true' : '';
+            const url = `/api/ai/daily-summary/${selectedDevice}?date=${encodeURIComponent(dateInput.value)}${refreshParam}`;
+
+            status.className = 'alert alert-info';
+            status.textContent = '⏳ Generating AI summary...';
+            status.style.display = 'block';
+            output.textContent = '';
+
+            fetch(url)
+                .then(res => res.json().then(data => ({ ok: res.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok) {
+                        status.className = 'alert alert-error';
+                        status.textContent = data.error || 'Failed to generate summary.';
+                        output.textContent = '';
+                        return;
+                    }
+
+                    const sourceText = data.source === 'cache' ? 'Cached' : 'Gemini';
+                    status.className = 'alert alert-success';
+                    status.textContent = `✅ Summary ready (${sourceText}) for ${data.summary_date}`;
+                    output.textContent = data.summary || 'No summary available.';
+                })
+                .catch(err => {
+                    status.className = 'alert alert-error';
+                    status.textContent = `❌ ${err.message}`;
+                    output.textContent = '';
+                });
+        }
+
+        function loadDailyReport() {
+            if (!selectedDevice) {
+                alert('⚠️ Please select a device first');
+                return;
+            }
+
+            const dateInput = document.getElementById('daily-report-date');
+            const status = document.getElementById('daily-report-status');
+            if (!dateInput.value) {
+                dateInput.value = new Date().toISOString().split('T')[0];
+            }
+
+            status.className = 'alert alert-info';
+            status.textContent = '⏳ Loading daily report...';
+            status.style.display = 'block';
+
+            fetch(`/api/daily-report/${selectedDevice}?date=${encodeURIComponent(dateInput.value)}`)
+                .then(res => res.json().then(data => ({ ok: res.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok) {
+                        status.className = 'alert alert-error';
+                        status.textContent = data.error || 'Failed to load report.';
+                        return;
+                    }
+
+                    status.className = 'alert alert-success';
+                    status.textContent = `✅ Report loaded for ${data.date}`;
+
+                    const ksContainer = document.getElementById('daily-report-keystrokes');
+                    const historyContainer = document.getElementById('daily-report-history');
+                    const appsContainer = document.getElementById('daily-report-apps');
+                    const browserContainer = document.getElementById('daily-report-browser');
+
+                    if (!data.keystrokes || data.keystrokes.length === 0) {
+                        ksContainer.innerHTML = '<p style="color: #999;">No keystrokes recorded.</p>';
+                    } else {
+                        ksContainer.innerHTML = data.keystrokes.map(item => `
+                            <div class="history-item">
+                                <div style="white-space: pre-wrap; word-break: break-word;">${item.text || ''}</div>
+                                <span class="history-time">📅 ${item.created_at || ''}</span>
+                            </div>
+                        `).join('');
+                    }
+
+                    if (!data.browser_history || data.browser_history.length === 0) {
+                        historyContainer.innerHTML = '<p style="color: #999;">No website visits recorded.</p>';
+                    } else {
+                        historyContainer.innerHTML = data.browser_history.map(item => `
+                            <div class="history-item">
+                                <div style="font-weight: bold;">${item.title || 'No Title'}</div>
+                                <div style="font-size: 12px; color: #1d4ed8; word-break: break-all;">${item.url || ''}</div>
+                                <span class="history-time">🕒 ${item.visited_at || item.created_at || ''} ${item.browser ? '• ' + item.browser : ''}</span>
+                            </div>
+                        `).join('');
+                    }
+
+                    if (!data.app_usage || data.app_usage.length === 0) {
+                        appsContainer.innerHTML = '<p style="color: #999;">No app usage recorded.</p>';
+                    } else {
+                        appsContainer.innerHTML = data.app_usage.map(item => `
+                            <div class="history-item">
+                                <div style="font-weight: bold;">${item.app_name || item.process_name || 'Unknown'}</div>
+                                <span class="history-time">⏱️ ${item.duration || 0} sec • ${item.created_at || ''}</span>
+                            </div>
+                        `).join('');
+                    }
+
+                    if (!data.browser_usage || data.browser_usage.length === 0) {
+                        browserContainer.innerHTML = '<p style="color: #999;">No browser time recorded.</p>';
+                    } else {
+                        browserContainer.innerHTML = data.browser_usage.map(item => `
+                            <div class="history-item">
+                                <div style="font-weight: bold;">${item.browser || 'Browser'}</div>
+                                <div style="font-size: 12px;">${item.window_title || ''}</div>
+                                <span class="history-time">⏱️ ${item.duration || 0} sec • ${item.created_at || ''}</span>
+                            </div>
+                        `).join('');
+                    }
+                })
+                .catch(err => {
+                    status.className = 'alert alert-error';
+                    status.textContent = `❌ ${err.message}`;
                 });
         }
 
@@ -1402,6 +1711,126 @@
             })
             .catch(err => showOutput(`❌ Error: ${err.message}`));
         }
+
+        // ==================== NEW WEBSITE BLOCKING FUNCTIONS ====================
+
+        function loadBlockedWebsites() {
+            if (!selectedDevice) {
+                document.getElementById('blocked-websites-list').innerHTML = 
+                    '<p style="color: #9ca3af; text-align: center; padding: 20px;">Please select a device first</p>';
+                return;
+            }
+
+            document.getElementById('blocked-websites-list').innerHTML = 
+                '<p style="color: #9ca3af; text-align: center; padding: 20px;">Loading...</p>';
+
+            fetch(`/api/blocked-websites?device_id=${selectedDevice}`)
+                .then(res => res.json())
+                .then(sites => {
+                    const container = document.getElementById('blocked-websites-list');
+                    
+                    if (!sites || sites.length === 0) {
+                        container.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 20px;">✅ No websites blocked</p>';
+                        return;
+                    }
+
+                    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+                    
+                    sites.forEach(site => {
+                        const blockedDate = new Date(site.blocked_at).toLocaleString();
+                        html += `
+                            <div style="background: #fee2e2; padding: 12px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid #ef4444;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: bold; color: #991b1b; font-size: 14px;">🚫 ${site.url}</div>
+                                    <div style="font-size: 11px; color: #7f1d1d; margin-top: 3px;">Blocked on: ${blockedDate}</div>
+                                </div>
+                                <button onclick="removeBlockedWebsite('${site._id}')" 
+                                    style="background: #10b981; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600;">
+                                    ✅ Unblock
+                                </button>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    container.innerHTML = html;
+                })
+                .catch(err => {
+                    document.getElementById('blocked-websites-list').innerHTML = 
+                        `<p style="color: #ef4444; text-align: center; padding: 20px;">❌ Error: ${err.message}</p>`;
+                });
+        }
+
+        function addBlockedWebsite() {
+            if (!selectedDevice) {
+                alert('⚠️ Please select a device first');
+                return;
+            }
+
+            const urlInput = document.getElementById('block-url-input');
+            const url = urlInput.value.trim();
+
+            if (!url) {
+                alert('⚠️ Please enter a website URL to block');
+                return;
+            }
+
+            fetch('/api/block-website', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_id: selectedDevice,
+                    url: url
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showOutput(`✅ Website blocked: ${url}\n⚠️ IMPORTANT: Please restart Chrome/Edge browser on the child's PC for blocking to take effect!`);
+                    alert('✅ Website blocked!\n\n⚠️ IMPORTANT: Restart Chrome or Edge browser on the child\'s PC for blocking to take effect!');
+                    urlInput.value = '';
+                    loadBlockedWebsites();
+                } else {
+                    alert(`❌ Error: ${data.error}`);
+                }
+            })
+            .catch(err => {
+                alert(`❌ Error: ${err.message}`);
+            });
+        }
+
+        function removeBlockedWebsite(websiteId) {
+            if (!selectedDevice) {
+                alert('⚠️ Please select a device first');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to unblock this website?')) {
+                return;
+            }
+
+            fetch('/api/unblock-website', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_id: selectedDevice,
+                    website_id: websiteId
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showOutput('✅ Website unblocked successfully\n⚠️ IMPORTANT: Please restart Chrome/Edge browser on the child\'s PC for changes to take effect!');
+                    alert('✅ Website unblocked!\n\n⚠️ IMPORTANT: Restart Chrome or Edge browser on the child\'s PC for changes to take effect!');
+                    loadBlockedWebsites();
+                } else {
+                    alert(`❌ Error: ${data.error}`);
+                }
+            })
+            .catch(err => {
+                alert(`❌ Error: ${err.message}`);
+            });
+        }
         
         function showOutput(message) {
             const output = document.getElementById('output');
@@ -1654,6 +2083,10 @@
                 loadAppUsage();
             } else if (tabName === 'command-history') {
                 loadCommandHistory();
+            } else if (tabName === 'ai-summary') {
+                loadAiSummary(false);
+            } else if (tabName === 'daily-report') {
+                loadDailyReport();
             }
         }
 

