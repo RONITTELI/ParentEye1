@@ -1,0 +1,1678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Child Monitoring System - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            flex: 1;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-profile {
+            background: #f0f9ff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .user-profile-name {
+            font-weight: 600;
+            color: #1e40af;
+            font-size: 14px;
+        }
+
+        .user-profile-type {
+            font-size: 11px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .logout-btn {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .devices-section {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .devices-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .devices-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .device-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .device-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .device-name {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .device-info {
+            font-size: 13px;
+            opacity: 0.9;
+            margin-bottom: 6px;
+        }
+
+        .device-status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            font-size: 12px;
+        }
+
+        .status-online {
+            background: #4ade80;
+            color: white;
+        }
+
+        .status-offline {
+            background: #ef4444;
+            color: white;
+        }
+
+        .controls-section {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .controls-section h2 {
+            color: #333;
+            margin-bottom: 18px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(245, 158, 11, 0.3);
+        }
+
+        .btn-success {
+            background: #4ade80;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #22c55e;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(74, 222, 128, 0.3);
+        }
+
+        .output-section {
+            background: #0f172a;
+            color: #10b981;
+            padding: 18px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 500px;
+            overflow-y: auto;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            border: 2px solid #1e40af;
+            line-height: 1.6;
+        }
+
+        .screenshot-container {
+            margin-top: 15px;
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 6px;
+        }
+
+        .screenshot-container img {
+            max-width: 100%;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 18px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .tab-btn {
+            padding: 10px 16px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-btn:hover {
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        input[type="number"], input[type="text"] {
+            padding: 10px 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            flex: 1;
+            font-size: 13px;
+        }
+
+        .history-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 12px 15px;
+            border-left: 4px solid #667eea;
+            background: #f9fafb;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            font-size: 13px;
+        }
+
+        .history-time {
+            color: #666;
+            font-size: 12px;
+            display: block;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        .loader {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .online {
+            background: #10b981;
+            animation: pulse-green 2s infinite;
+        }
+
+        .offline {
+            background: #ef4444;
+        }
+
+        @keyframes pulse-green {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Scrollbar styling */
+        .output-section::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .output-section::-webkit-scrollbar-track {
+            background: #1e3a8a;
+            border-radius: 5px;
+        }
+
+        .output-section::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 5px;
+        }
+
+        .output-section::-webkit-scrollbar-thumb:hover {
+            background: #1e40af;
+        }
+
+        .alert {
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            background: #dcfce7;
+            color: #166534;
+            border-left: 4px solid #4ade80;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            color: #1e3a8a;
+            border-left: 4px solid #3b82f6;
+        }
+
+        @media (max-width: 768px) {
+            .devices-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .controls-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .controls-section {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <h1>👶 Child Monitoring System</h1>
+                <p class="subtitle">Control and monitor child's device activity</p>
+            </div>
+            <div class="header-right">
+                <div class="user-profile" id="userProfile">
+                    <div class="user-profile-name" id="userName">Loading...</div>
+                    <div class="user-profile-type" id="userType">...</div>
+                </div>
+                <button class="logout-btn" onclick="logout()">
+                    🚪 Logout
+                </button>
+            </div>
+        </header>
+
+        <div class="devices-section">
+            <h2>📱 Connected Devices</h2>
+            <div class="devices-grid" id="devicesGrid">
+                <div class="device-card" style="background: #667eea;">
+                    <div class="loader" style="color: white;"></div>
+                    <p style="margin-top: 3px;">Loading devices...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="device-not-selected" style="background: rgba(255, 255, 255, 0.95); padding: 40px; border-radius: 10px; text-align: center;">
+            <h3 style="color: #666;">Select a device to view controls</h3>
+            <p style="color: #999; margin-top: 3px;">Click on a device card above to access monitoring and control options</p>
+        </div>
+
+        <div id="controls-container" style="display: none;">
+            <div class="controls-section">
+                <h2>🎮 Device Controls - <span id="selected-device-name"></span></h2>
+                <div id="device-pcinfo"></div>
+
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchTab('commands')">Commands</button>
+                    <button class="tab-btn" onclick="switchTab('advanced')">Advanced Controls</button>
+                    <button class="tab-btn" onclick="switchTab('screenshots')">Screenshots</button>
+                    <button class="tab-btn" onclick="switchTab('keystrokes')">Keystrokes</button>
+                    <button class="tab-btn" onclick="switchTab('history')">History</button>
+                    <button class="tab-btn" onclick="switchTab('command-history')">Command Log</button>
+                </div>
+
+                <!-- Commands Tab -->
+                <div id="commands" class="tab-content active">
+                    <h3 style="color: #333; margin-bottom: 15px;">📍 Location & Tracking</h3>
+                    <div class="controls-grid">
+                        <button class="btn-primary" onclick="showLocation()">📍 Show Location</button>
+                        <button class="btn-success" onclick="refreshLocation()">🔄 Refresh Location</button>
+                    </div>
+                    
+                    <div id="location-display" style="display: none; background: #f0f9ff; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #3b82f6;">
+                        <div id="location-data" style="font-size: 14px;"></div>
+                    </div>
+
+                    <h3 style="color: #333; margin-top: 30px; margin-bottom: 15px;">🚫 Website & App Blocking</h3>
+                    <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <div style="background: #fef2f2; border-left: 2px solid #ef4444; padding: 6px; margin-bottom: 5px; border-radius: 3px; font-size: 11px;">
+                            <strong style="color: #991b1b;">⚠️ Admin Required:</strong>
+                            <span style="color: #7f1d1d; font-size: 13px;">Client must run as Administrator for website blocking</span>
+                        </div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #92400e;">🌐 Block Websites:</label>
+                        <input type="text" id="website-input" placeholder="e.g., facebook.com, youtube.com" style="width: 100%; padding: 4px; border: 1px solid #f59e0b; border-radius: 3px; margin-bottom: 5px; font-size: 11px;" />
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn-danger" onclick="blockWebsites()" style="flex: 1;">🚫 Block</button>
+                            <button class="btn-success" onclick="unblockWebsites()" style="flex: 1;">✅ Unblock</button>
+                        </div>
+                    </div>
+                    
+                    <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #92400e;">🎮 Block Application:</label>
+                        <input type="text" id="exe-input" placeholder="e.g., chrome.exe, discord.exe, fortnite.exe" style="width: 100%; padding: 4px; border: 1px solid #f59e0b; border-radius: 3px; margin-bottom: 5px; font-size: 11px;" />
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn-danger" onclick="blockExe()" style="flex: 1;">🚫 Block</button>
+                            <button class="btn-success" onclick="unblockExe()" style="flex: 1;">✅ Unblock</button>
+                        </div>
+                    </div>
+
+                    <h3 style="color: #333; margin-top: 30px; margin-bottom: 15px;">📸 Monitoring Commands</h3>
+                    <div class="controls-grid">
+                        <button class="btn-warning" onclick="executeCommand('screenshot')">📸 Screenshot</button>
+                        <button class="btn-warning" onclick="executeCommand('webcam')">📷 Webcam</button>
+                        <button class="btn-primary" onclick="executeCommand('chromehistory')">🌐 Chrome History</button>
+                        <button class="btn-success" onclick="startRecording()">🎥 Record Screen</button>
+                        <div style="grid-column: span 2; background: #10b981; color: white; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold;">
+                            ✅ Keystroke Monitoring: ACTIVE
+                        </div>
+                    </div>
+
+                    <h3 style="color: #333; margin-top: 30px; margin-bottom: 15px;">⚠️ Dangerous Commands</h3>
+                    <div class="controls-grid">
+                        <button class="btn-primary" onclick="executeCommand('lock')">🔒 Lock PC</button>
+                        <button class="btn-warning" onclick="executeCommand('logout')">🚪 Logout</button>
+                        <button class="btn-danger" onclick="executeCommand('restart')">🔄 Restart</button>
+                        <button class="btn-danger" onclick="executeCommand('shutdown')">⚠️ Shutdown</button>
+                    </div>
+
+                    <!-- Terminal Output Section -->
+                    <div style="margin-top: 25px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <h3 style="color: #333; font-size: 16px; font-weight: 600; margin: 0;">📺 Terminal Output</h3>
+                            <button class="btn-primary" onclick="clearOutput()" style="padding: 8px 16px; font-size: 12px;">🗑️ Clear</button>
+                        </div>
+                        <div id="output" class="output-section">🟢 Terminal ready. Operations will be logged here...</div>
+                    </div>
+                </div>
+
+                <!-- Advanced Controls Tab -->
+                <div id="advanced" class="tab-content">
+                    <h3 style="color: #333; margin-bottom: 20px;">🎛️ Advanced Features & Scheduling</h3>
+                    
+                    <!-- Popup Alert Section -->
+                    <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+                        <h4 style="color: #92400e; margin-bottom: 15px;">⚠️ Send Popup Alert</h4>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-bottom: 5px;">
+                            <input type="text" id="alert-title" placeholder="Alert title" style="padding: 8px; border: 1px solid #f59e0b; border-radius: 5px;" />
+                            <textarea id="alert-message" placeholder="Alert message" style="padding: 8px; border: 1px solid #f59e0b; border-radius: 5px; resize: vertical;"></textarea>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                            <div>
+                                <label style="font-weight: bold; font-size: 12px; color: #92400e;">Duration (sec):</label>
+                                <input type="number" id="alert-duration" value="5" min="1" max="60" style="width: 100%; padding: 8px; border: 1px solid #f59e0b; border-radius: 5px;" />
+                            </div>
+                            <div>
+                                <label style="font-weight: bold; font-size: 12px; color: #92400e;">Priority:</label>
+                                <select id="alert-priority" style="width: 100%; padding: 8px; border: 1px solid #f59e0b; border-radius: 5px;">
+                                    <option value="low">Low</option>
+                                    <option value="normal" selected>Normal</option>
+                                    <option value="high">High</option>
+                                    <option value="critical">Critical</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-weight: bold; font-size: 12px; color: #92400e;">
+                                    <input type="checkbox" id="alert-voice" /> Text-to-Speech?
+                                </label>
+                            </div>
+                        </div>
+                        <button class="btn-warning" onclick="sendPopupAlert()" style="width: 100%;">📢 Send Alert Now</button>
+                    </div>
+
+                    <!-- Time Restrictions Section -->
+                    <div style="background: #dbeafe; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3b82f6;">
+                        <h4 style="color: #1e40af; margin-bottom: 15px;">⏰ Time Restrictions</h4>
+                        <p style="color: #1e40af; font-size: 11px; margin-bottom: 5px;">📅 Schedule when apps/websites can be blocked</p>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                            <div>
+                                <label style="font-weight: bold; font-size: 12px; color: #1e40af;">Type:</label>
+                                <select id="restriction-type" style="width: 100%; padding: 8px; border: 1px solid #3b82f6; border-radius: 5px;">
+                                    <option value="website">Website</option>
+                                    <option value="app">Application</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-weight: bold; font-size: 12px; color: #1e40af;">Name:</label>
+                                <input type="text" id="restriction-name" placeholder="e.g., facebook.com" style="width: 100%; padding: 8px; border: 1px solid #3b82f6; border-radius: 5px;" />
+                            </div>
+                            <div>
+                                <label style="font-weight: bold; font-size: 12px; color: #1e40af;">Days:</label>
+                                <select id="restriction-days" multiple style="width: 100%; padding: 8px; border: 1px solid #3b82f6; border-radius: 5px; height: 38px;">
+                                    <option value="1">Monday</option>
+                                    <option value="2">Tuesday</option>
+                                    <option value="3">Wednesday</option>
+                                    <option value="4">Thursday</option>
+                                    <option value="5">Friday</option>
+                                    <option value="6">Saturday</option>
+                                    <option value="0">Sunday</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 5px;">
+                            <div>
+                                <label style="font-weight: bold; font-size: 12px; color: #1e40af;">Start Time:</label>
+                                <input type="time" id="restriction-start" style="width: 100%; padding: 8px; border: 1px solid #3b82f6; border-radius: 5px;" />
+                            </div>
+                            <div>
+                                <label style="font-weight: bold; font-size: 12px; color: #1e40af;">End Time:</label>
+                                <input type="time" id="restriction-end" style="width: 100%; padding: 8px; border: 1px solid #3b82f6; border-radius: 5px;" />
+                            </div>
+                        </div>
+                        <button class="btn-primary" onclick="addTimeRestriction()" style="width: 100%; margin-bottom: 5px; padding: 4px;">➕ Add Restriction</button>
+                        <div id="restrictions-list" style="background: white; border-radius: 5px; padding: 10px; max-height: 200px; overflow-y: auto;"></div>
+                    </div>
+
+                    <!-- App Usage Statistics Section -->
+                    <div style="background: #dcfce7; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #4ade80;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h4 style="color: #166534; margin: 0;">📊 App Usage Statistics</h4>
+                            <button class="btn-success" onclick="loadAppUsage()" style="padding: 6px 12px; font-size: 12px;">🔄 Refresh</button>
+                        </div>
+                        <div id="app-usage-container" style="background: white; border-radius: 5px; padding: 10px; max-height: 300px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+
+                <!-- Screenshots Tab -->
+                <div id="screenshots" class="tab-content">
+                    <h3 style="color: #333; margin-bottom: 15px;">Recent Screenshots</h3>
+                    <div id="screenshots-container"></div>
+                </div>
+
+                <!-- Keystrokes Tab -->
+                <div id="keystrokes" class="tab-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="color: #333; margin: 0;">Keystroke Logs</h3>
+                        <span style="background: #10b981; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold;">
+                            🔴 LIVE MONITORING
+                        </span>
+                    </div>
+                    <p style="color: #6b7280; font-size: 14px; margin-bottom: 15px;">
+                        📝 All keystrokes are recorded automatically. <b>Enter</b> key shows as new line (↵)
+                    </p>
+                    <div id="keystrokes-container" class="history-list"></div>
+                </div>
+
+                <!-- History Tab -->
+                <div id="history" class="tab-content">
+                    <h3 style="color: #333; margin-bottom: 15px;">Chrome History</h3>
+                    <div id="history-container" class="history-list"></div>
+                </div>
+
+                <!-- Command History Tab -->
+                <div id="command-history" class="tab-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="color: #333; margin: 0;">🗂️ Command Execution Log</h3>
+                        <button class="btn-success" onclick="loadCommandHistory()" style="padding: 8px 12px; font-size: 12px;">🔄 Refresh</button>
+                    </div>
+                    <p style="color: #6b7280; font-size: 13px; margin-bottom: 15px;">📋 Complete history of all commands sent to this device</p>
+                    <div id="command-history-container" style="background: white; border-radius: 5px; padding: 10px; max-height: 500px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedDevice = null;
+
+        // Load devices on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserProfile();
+            loadDevices();
+            // Refresh devices every 10 seconds
+            setInterval(loadDevices, 10000);
+        });
+
+        function loadUserProfile() {
+            fetch('/api/user/profile')
+                .then(res => res.json())
+                .then(user => {
+                    const userName = document.getElementById('userName');
+                    const userType = document.getElementById('userType');
+                    
+                    userName.textContent = `👤 ${user.name}`;
+                    
+                    if (user.user_type === 'admin') {
+                        userType.textContent = '🔐 Administrator';
+                    } else {
+                        userType.textContent = `👨‍👩‍👧 Parent Account (${user.username})`;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading user profile:', err);
+                    document.getElementById('userName').textContent = '❌ Error loading profile';
+                });
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                window.location.href = '/logout';
+            }
+        }
+
+        function loadDevices() {
+            fetch('/api/devices')
+                .then(res => res.json())
+                .then(devices => {
+                    const grid = document.getElementById('devicesGrid');
+                    if (devices.length === 0) {
+                        grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #999;">No devices registered yet</p>';
+                        return;
+                    }
+
+                    grid.innerHTML = devices.map(device => `
+                        <div class="device-card" onclick="selectDevice('${device.device_id}', '${device.device_name}')">
+                            <div class="device-name">${device.device_name}</div>
+                            <div class="device-info">
+                                <span class="status-indicator ${device.status === 'online' ? 'online' : 'offline'}"></span>
+                                ${device.status === 'online' ? 'Online' : 'Offline'}
+                            </div>
+                            <div class="device-info">ID: ${device.device_id}</div>
+                            <div class="device-info">👤 ${device.parent_name || 'Unassigned'}</div>
+                            <div class="device-status status-${device.status}">
+                                📅 Last seen: ${device.last_seen ? new Date(device.last_seen).toLocaleString() : 'Never'}
+                            </div>
+                            <div class="device-status" style="font-size: 9px; margin-top: 2px; color: #aaa;">
+                                🕒 Registered: ${device.registered_at ? new Date(device.registered_at).toLocaleString() : 'Unknown'}
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(err => console.error('Error loading devices:', err));
+        }
+
+        function selectDevice(deviceId, deviceName) {
+            selectedDevice = deviceId;
+            document.getElementById('selected-device-name').textContent = deviceName;
+            document.getElementById('device-not-selected').style.display = 'none';
+            document.getElementById('controls-container').style.display = 'block';
+            
+            // Load device info and data
+            loadPCInfo();
+            loadScreenshots();
+            loadKeystrokes();
+            loadHistory();
+        }
+
+        function loadPCInfo() {
+            if (!selectedDevice) return;
+            
+            fetch('/api/device/' + selectedDevice)
+                .then(res => res.json())
+                .then(device => {
+                    const info = device.pc_info || {};
+                    document.getElementById('device-pcinfo').innerHTML = `
+                        <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px;">
+                            <strong>System:</strong> ${info.system || 'N/A'}<br>
+                            <strong>IP Address:</strong> ${info.ip_address || 'N/A'}<br>
+                            <strong>CPU Usage:</strong> ${info.cpu_usage || 0}%<br>
+                            <strong>RAM:</strong> ${info.ram_used || 0}MB / ${info.ram_total || 0}MB<br>
+                            <strong>Disk:</strong> ${info.disk_used || 0}GB / ${info.disk_total || 0}GB
+                        </div>
+                    `;
+                });
+        }
+
+        function executeCommand(command) {
+            if (!selectedDevice) {
+                alert('Please select a device first');
+                return;
+            }
+
+            const output = document.getElementById('output');
+            output.style.display = 'block';
+            output.innerHTML = '⏳ Executing command...';
+
+            const commandUrl = `/api/command/${command}`;
+            const payload = { device_id: selectedDevice };
+
+            fetch(commandUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    if (data.image) {
+                        output.innerHTML = `✅ Command executed successfully\n<img src="data:image/png;base64,${data.image}" style="max-width: 100%; margin-top: 3px; border-radius: 3px;">`;
+                    } else if (data.data) {
+                        output.innerHTML = '✅ ' + JSON.stringify(data.data, null, 2);
+                    } else if (data.history) {
+                        output.innerHTML = '✅ Chrome History:\n' + data.history.map(h => `${h.title}\n${h.url}`).join('\n\n');
+                    } else {
+                        output.innerHTML = '✅ ' + (data.message || 'Command executed successfully');
+                    }
+                } else {
+                    output.innerHTML = '❌ Error: ' + (data.message || 'Unknown error');
+                }
+            })
+            .catch(err => {
+                output.innerHTML = '❌ Error: ' + err.message;
+            });
+        }
+
+        function startRecording() {
+            const duration = prompt('Enter recording duration in seconds:', '10');
+            if (duration) {
+                fetch('/api/command/record', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ device_id: selectedDevice, duration: parseInt(duration) })
+                })
+                .then(res => res.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'screen_record.mp4';
+                    a.click();
+                });
+            }
+        }
+
+        function startKeylogger() {
+            executeCommand('keystrokes_start');
+        }
+
+        function stopKeylogger() {
+            executeCommand('keystrokes_stop');
+        }
+
+        function loadScreenshots() {
+            if (!selectedDevice) return;
+            
+            fetch(`/api/screenshots/${selectedDevice}`)
+                .then(res => res.json())
+                .then(screenshots => {
+                    const container = document.getElementById('screenshots-container');
+                    if (!screenshots || screenshots.length === 0) {
+                        container.innerHTML = '<p style="color: #999;">📸 No screenshots yet. Click "Screenshot" button to capture.</p>';
+                        return;
+                    }
+
+                    container.innerHTML = screenshots.map(ss => `
+                        <div class="screenshot-container">
+                            <img src="data:image/png;base64,${ss.image_base64}" alt="Screenshot">
+                            <p style="color: #666; font-size: 10px; margin-top: 3px;">📷 ${new Date(ss.created_at).toLocaleString()}</p>
+                            <p style="color: #999; font-size: 9px;">ID: ${ss._id.substring(0, 8)}...</p>
+                        </div>
+                    `).join('');
+                })
+                .catch(err => {
+                    console.debug('Screenshot load error (expected when no data):', err);
+                });
+        }
+
+        function loadKeystrokes() {
+            if (!selectedDevice) return;
+            
+            fetch(`/api/keystrokes/${selectedDevice}`)
+                .then(res => {
+                    if (!res.ok) throw new Error('Failed to load keystrokes');
+                    return res.json();
+                })
+                .then(logs => {
+                    const container = document.getElementById('keystrokes-container');
+                    if (!logs || logs.length === 0) {
+                        container.innerHTML = '<p style="color: #999;">✅ Keystroke monitoring is active. Typed text will appear here.</p>';
+                        return;
+                    }
+
+                    container.innerHTML = logs.map(log => {
+                        // Replace [ENTER] with line breaks for better readability
+                        const formattedText = log.text
+                            .replace(/\[ENTER\]/g, '<br>↵ ')
+                            .replace(/\[TAB\]/g, ' → ');
+                        
+                        return `
+                        <div class="history-item">
+                            <div style="white-space: pre-wrap; word-break: break-word; line-height: 1.6;">
+                                ${formattedText}
+                            </div>
+                            <span class="history-time">📅 ${new Date(log.created_at).toLocaleString()}</span>
+                        </div>
+                    `}).join('');
+                })
+                .catch(error => {
+                    // Silently ignore errors - data may not be available yet
+                    console.debug('Keystroke load error (expected when no data):', error);
+                });
+        }
+        
+        function loadHistory() {
+            if (!selectedDevice) return;
+            
+            fetch(`/api/history/${selectedDevice}`)
+                .then(res => res.json())
+                .then(history => {
+                    const container = document.getElementById('history-container');
+                    
+                    if (!history || history.length === 0) {
+                        container.innerHTML = `
+                            <div style="text-align: center; padding: 20px; color: #999;">
+                                <p>🌐 No Chrome history available yet.</p>
+                                <p style="margin-top: 3px; font-size: 11px;">Click the "Chrome History" button in Commands tab to fetch browsing history.</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    container.innerHTML = history.map((item, index) => `
+                        <div class="history-item" style="border-left-color: ${index % 2 === 0 ? '#667eea' : '#764ba2'};">
+                            <div style="font-weight: bold; color: #333; margin-bottom: 3px;">${item.title || 'No Title'}</div>
+                            <a href="${item.url || '#'}" target="_blank" style="color: #3b82f6; text-decoration: none; font-size: 11px; word-break: break-all;">
+                                🔗 ${item.url || 'No URL'}
+                            </a>
+                            <div style="font-size: 9px; color: #999; margin-top: 2px;">
+                                📅 ${item.created_at ? new Date(item.created_at).toLocaleString() : (item.timestamp ? new Date(item.timestamp).toLocaleString() : 'No timestamp')}
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => {
+                    console.debug('History load error (expected when no data):', error);
+                });
+        }
+
+        // ==================== ADVANCED CONTROL FUNCTIONS ====================
+
+        function addTimeRestriction() {
+            if (!selectedDevice) {
+                alert('⚠️ Please select a device first');
+                return;
+            }
+
+            const type = document.getElementById('restriction-type').value;
+            const name = document.getElementById('restriction-name').value.trim();
+            const daysSelect = document.getElementById('restriction-days');
+            const days = Array.from(daysSelect.selectedOptions).map(o => parseInt(o.value));
+            const startTime = document.getElementById('restriction-start').value;
+            const endTime = document.getElementById('restriction-end').value;
+
+            if (!name || days.length === 0 || !startTime || !endTime) {
+                alert('⚠️ Please fill all fields');
+                return;
+            }
+
+            showOutput('⏰ Adding time restriction...');
+
+            fetch('/api/time-restrictions', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_id: selectedDevice,
+                    type: type,
+                    name: name,
+                    days: days,
+                    start_time: startTime,
+                    end_time: endTime
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showOutput(`✅ ${data.message}`);
+                    document.getElementById('restriction-name').value = '';
+                    loadTimeRestrictions();
+                } else {
+                    showOutput(`❌ Error: ${data.error || 'Failed to add restriction'}`);
+                }
+            })
+            .catch(err => showOutput(`❌ Error: ${err.message}`));
+        }
+
+        function loadTimeRestrictions() {
+            if (!selectedDevice) return;
+
+            fetch(`/api/time-restrictions/${selectedDevice}`)
+                .then(res => res.json())
+                .then(restrictions => {
+                    const container = document.getElementById('restrictions-list');
+                    
+                    if (!restrictions || restrictions.length === 0) {
+                        container.innerHTML = '<p style="color: #999; padding: 10px;">No time restrictions set yet</p>';
+                        return;
+                    }
+
+                    let html = '<div style="font-size: 13px;">';
+                    restrictions.forEach(r => {
+                        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                        const dayNames = r.days.map(d => days[d]).join(', ');
+                        html += `
+                            <div style="background: #f3f4f6; padding: 8px; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>${r.name}</strong> (${r.type})<br>
+                                    <span style="color: #666; font-size: 11px;">${dayNames}: ${r.start_time} - ${r.end_time}</span>
+                                </div>
+                                <button onclick="deleteRestriction('${r._id}')" class="btn-danger" style="padding: 4px 8px; font-size: 11px;">❌</button>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    container.innerHTML = html;
+                })
+                .catch(err => console.error('Error loading restrictions:', err));
+        }
+
+        function deleteRestriction(restrictionId) {
+            if (confirm('❓ Delete this restriction?')) {
+                fetch(`/api/time-restrictions/${restrictionId}`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'}
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showOutput('✅ Restriction deleted');
+                        loadTimeRestrictions();
+                    } else {
+                        showOutput(`❌ Error: ${data.error}`);
+                    }
+                })
+                .catch(err => showOutput(`❌ Error: ${err.message}`));
+            }
+        }
+
+        function loadAppUsage() {
+            if (!selectedDevice) return;
+
+            fetch(`/api/app-usage/${selectedDevice}`)
+                .then(res => res.json())
+                .then(data => {
+                    const container = document.getElementById('app-usage-container');
+                    
+                    if (!data || data.length === 0) {
+                        container.innerHTML = '<p style="color: #999; padding: 20px; text-align: center;">📊 No app usage data available yet</p>';
+                        return;
+                    }
+
+                    // Sort by duration and take top 10
+                    const topApps = data.slice(0, 10);
+                    
+                    let html = '<div style="font-size: 13px;">';
+                    const maxDuration = Math.max(...topApps.map(a => a.duration || 0));
+
+                    topApps.forEach((app, index) => {
+                        const duration = app.duration || 0;
+                        const percentage = maxDuration > 0 ? (duration / maxDuration * 100) : 0;
+                        const hours = Math.floor(duration / 3600);
+                        const minutes = Math.floor((duration % 3600) / 60);
+                        const timeStr = `${hours}h ${minutes}m`;
+
+                        html += `
+                            <div style="margin-bottom: 12px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                    <strong>${app.app_name || 'Unknown'}</strong>
+                                    <span style="color: #666; font-weight: bold;">${timeStr}</span>
+                                </div>
+                                <div style="background: #e5e7eb; height: 20px; border-radius: 10px; overflow: hidden;">
+                                    <div style="background: linear-gradient(90deg, #667eea, #764ba2); height: 100%; width: ${percentage}%; transition: width 0.3s;"></div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    // Total screen time
+                    const totalSeconds = data.reduce((sum, a) => sum + (a.duration || 0), 0);
+                    const totalHours = Math.floor(totalSeconds / 3600);
+                    const totalMins = Math.floor((totalSeconds % 3600) / 60);
+
+                    html += `
+                        <div style="background: #dbeafe; padding: 10px; border-radius: 5px; margin-top: 15px; text-align: center; border-left: 4px solid #3b82f6;">
+                            <strong>📊 Total Screen Time:</strong> ${totalHours}h ${totalMins}m
+                        </div>
+                    `;
+
+                    html += '</div>';
+                    container.innerHTML = html;
+                })
+                .catch(err => {
+                    const container = document.getElementById('app-usage-container');
+                    container.innerHTML = `<p style="color: #f87171;">❌ Error loading app usage: ${err.message}</p>`;
+                });
+        }
+
+        function loadCommandHistory() {
+            if (!selectedDevice) return;
+
+            showOutput('📋 Loading command history...');
+
+            fetch(`/api/commands/${selectedDevice}`)
+                .then(res => res.json())
+                .then(commands => {
+                    const container = document.getElementById('command-history-container');
+                    
+                    if (!commands || commands.length === 0) {
+                        container.innerHTML = '<p style="color: #999; padding: 20px; text-align: center;">📋 No commands executed yet</p>';
+                        return;
+                    }
+
+                    let html = `
+                        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                            <thead>
+                                <tr style="background: #f3f4f6; border-bottom: 2px solid #d1d5db;">
+                                    <th style="padding: 10px; text-align: left;">Command</th>
+                                    <th style="padding: 10px; text-align: left;">Status</th>
+                                    <th style="padding: 10px; text-align: left;">Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    commands.forEach(cmd => {
+                        const status = cmd.executed ? 'completed' : 'pending';
+                        const statusColor = status === 'completed' ? '#4ade80' : '#f59e0b';
+                        const time = new Date(cmd.created_at).toLocaleString();
+
+                        html += `
+                            <tr style="border-bottom: 1px solid #e5e5e5;">
+                                <td style="padding: 8px;"><strong>${cmd.command}</strong></td>
+                                <td style="padding: 8px;"><span style="background: ${statusColor}; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">${status}</span></td>
+                                <td style="padding: 8px; color: #666;">${time}</td>
+                            </tr>
+                        `;
+                    });
+
+                    html += '</tbody></table>';
+                    container.innerHTML = html;
+                    showOutput('✅ Command history loaded');
+                })
+                .catch(err => showOutput(`❌ Error: ${err.message}`));
+        }
+
+        // NEW FUNCTIONS FOR BLOCKING AND LOCATION
+        
+        function blockWebsites() {
+            if (!selectedDevice) {
+                alert('⚠️ Please select a device first');
+                return;
+            }
+            
+            const input = document.getElementById('website-input').value;
+            if (!input.trim()) {
+                alert('⚠️ Please enter website(s) to block');
+                return;
+            }
+            
+            const websites = input.split(',').map(w => w.trim()).filter(w => w);
+            
+            fetch('/api/command/block_website', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_id: selectedDevice,
+                    websites: websites
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showOutput(`✅ ${data.message}\nBlocked: ${websites.join(', ')}`);
+                    document.getElementById('website-input').value = '';
+                } else {
+                    showOutput(`❌ Error: ${data.message}`);
+                }
+            })
+            .catch(err => showOutput(`❌ Error: ${err.message}`));
+        }
+        
+        function unblockWebsites() {
+            if (!selectedDevice) {
+                alert('⚠️ Please select a device first');
+                return;
+            }
+            
+            const input = document.getElementById('website-input').value;
+            if (!input.trim()) {
+                alert('⚠️ Please enter website(s) to unblock');
+                return;
+            }
+            
+            const websites = input.split(',').map(w => w.trim()).filter(w => w);
+            
+            fetch('/api/command/unblock_website', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_id: selectedDevice,
+                    websites: websites
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showOutput(`✅ ${data.message}\nUnblocked: ${websites.join(', ')}`);
+                    document.getElementById('website-input').value = '';
+                } else {
+                    showOutput(`❌ Error: ${data.message}`);
+                }
+            })
+            .catch(err => showOutput(`❌ Error: ${err.message}`));
+        }
+        
+        function blockExe() {
+            if (!selectedDevice) {
+                alert('⚠️ Please select a device first');
+                return;
+            }
+            
+            const exeName = document.getElementById('exe-input').value.trim();
+            if (!exeName) {
+                alert('⚠️ Please enter an application name');
+                return;
+            }
+            
+            fetch('/api/command/block_exe', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_id: selectedDevice,
+                    exe_name: exeName
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showOutput(`✅ ${data.message}`);
+                    document.getElementById('exe-input').value = '';
+                } else {
+                    showOutput(`❌ Error: ${data.message}`);
+                }
+            })
+            .catch(err => showOutput(`❌ Error: ${err.message}`));
+        }
+        
+        function unblockExe() {
+            if (!selectedDevice) {
+                alert('⚠️ Please select a device first');
+                return;
+            }
+            
+            const exeName = document.getElementById('exe-input').value.trim();
+            if (!exeName) {
+                alert('⚠️ Please enter an application name');
+                return;
+            }
+            
+            fetch('/api/command/unblock_exe', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_id: selectedDevice,
+                    exe_name: exeName
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showOutput(`✅ ${data.message}\nUnblocked: ${exeName}`);
+                    document.getElementById('exe-input').value = '';
+                } else {
+                    showOutput(`❌ Error: ${data.message}`);
+                }
+            })
+            .catch(err => showOutput(`❌ Error: ${err.message}`));
+        }
+        
+        function showLocation() {
+            if (!selectedDevice) {
+                alert('⚠️ Please select a device first');
+                return;
+            }
+            
+            showOutput('🔍 Fetching location...');
+            
+            fetch(`/api/location/${selectedDevice}`)
+                .then(res => {
+                    if (!res.ok) throw new Error('Location not available');
+                    return res.json();
+                })
+                .then(data => {
+                    const locationDisplay = document.getElementById('location-display');
+                    const locationData = document.getElementById('location-data');
+                    
+                    if (data.location) {
+                        const loc = data.location;
+                        
+                        // Build location display based on available data
+                        let locationHTML = '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">';
+                        
+                        // Show method used
+                        if (loc.method) {
+                            locationHTML += `<div style="grid-column: span 2; background: ${loc.method.includes('WiFi') ? '#dcfce7' : '#fed7aa'}; padding: 10px; border-radius: 5px; text-align: center;">
+                                <strong>🎯 Method:</strong> ${loc.method}
+                            </div>`;
+                        }
+                        
+                        // Show detailed location if available (WiFi-based)
+                        if (loc.suburb) {
+                            locationHTML += `
+                                <div><strong>🏘️ Area/Suburb:</strong> ${loc.suburb}</div>
+                                <div><strong>🏙️ City:</strong> ${loc.city}</div>
+                                <div><strong>🗺️ State:</strong> ${loc.state || loc.region}</div>
+                                <div><strong>🌍 Country:</strong> ${loc.country}</div>
+                            `;
+                            
+                            if (loc.postcode) {
+                                locationHTML += `<div><strong>📮 Postcode:</strong> ${loc.postcode}</div>`;
+                            }
+                            
+                            if (loc.accuracy) {
+                                locationHTML += `<div><strong>🎯 Accuracy:</strong> ${loc.accuracy}</div>`;
+                            }
+                            
+                            if (loc.full_address) {
+                                locationHTML += `<div style="grid-column: span 2; padding: 10px; background: #f0f9ff; border-radius: 5px;">
+                                    <strong>📍 Full Address:</strong><br>${loc.full_address}
+                                </div>`;
+                            }
+                        } else {
+                            // IP-based location (less detailed)
+                            locationHTML += `
+                                <div><strong>🏙️ City:</strong> ${loc.city}</div>
+                                <div><strong>📍 State/Region:</strong> ${loc.region || loc.state}</div>
+                                <div><strong>🌍 Country:</strong> ${loc.country}</div>
+                            `;
+                            
+                            if (loc.ip) {
+                                locationHTML += `<div><strong>🌐 IP Address:</strong> ${loc.ip}</div>`;
+                            }
+                            
+                            if (loc.isp) {
+                                locationHTML += `<div><strong>📡 ISP:</strong> ${loc.isp}</div>`;
+                            }
+                            
+                            if (loc.accuracy) {
+                                locationHTML += `<div style="grid-column: span 2; background: #fef3c7; padding: 8px; border-radius: 5px; text-align: center;">
+                                    ${loc.accuracy}
+                                </div>`;
+                            }
+                        }
+                        
+                        locationHTML += `<div><strong>🕐 Last Updated:</strong> ${new Date(data.timestamp).toLocaleString()}</div>`;
+                        locationHTML += '</div>';
+                        
+                        // Add map link
+                        locationHTML += `
+                            <div style="margin-top: 5px; padding: 6px; background: white; border-radius: 3px; font-size: 11px;">
+                                <strong>📍 Coordinates:</strong> ${loc.lat.toFixed(6)}, ${loc.lon.toFixed(6)}
+                                <a href="https://www.google.com/maps?q=${loc.lat},${loc.lon}" target="_blank" style="margin-left: 5px; color: #3b82f6; font-size: 11px;">
+                                    🗺️ View on Google Maps
+                                </a>
+                            </div>
+                        `;
+                        
+                        locationData.innerHTML = locationHTML;
+                        locationDisplay.style.display = 'block';
+                        showOutput('✅ Location retrieved successfully!');
+                    } else {
+                        showOutput('❌ Location data not available yet. Please wait a few minutes.');
+                    }
+                })
+                .catch(err => {
+                    showOutput(`❌ Error: ${err.message}`);
+                });
+        }
+        
+        function refreshLocation() {
+            if (!selectedDevice) {
+                alert('⚠️ Please select a device first');
+                return;
+            }
+            
+            showOutput('🔄 Requesting fresh location from device...');
+            
+            // Trigger location fetch from device
+            fetch('/api/command/fetch_location', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({device_id: selectedDevice})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showOutput('✅ Location fetch requested. Please wait 5-10 seconds then click "Show Location"');
+                    // Auto-show location after 8 seconds
+                    setTimeout(() => {
+                        showLocation();
+                    }, 8000);
+                } else {
+                    showOutput(`❌ Error: ${data.message || 'Unknown error'}`);
+                }
+            })
+            .catch(err => showOutput(`❌ Error: ${err.message}`));
+        }
+        
+        function showOutput(message) {
+            const output = document.getElementById('output');
+            output.style.display = 'block';
+            // Append message with timestamp
+            const timestamp = new Date().toLocaleTimeString();
+            const newLine = `[${timestamp}] ${message}\n`;
+            output.textContent = newLine + output.textContent;
+            // Keep only last 100 lines
+            const lines = output.textContent.split('\n');
+            if (lines.length > 100) {
+                output.textContent = lines.slice(0, 100).join('\n');
+            }
+            // Auto-scroll to top
+            output.scrollTop = 0;
+        }
+
+        function clearOutput() {
+            const output = document.getElementById('output');
+            output.textContent = '🟢 Terminal cleared at ' + new Date().toLocaleTimeString();
+        }
+
+        // ==================== ADVANCED FEATURES ====================
+
+        function sendPopupAlert() {
+            if (!selectedDevice) {
+                alert('⚠️ Please select a device first');
+                return;
+            }
+
+            const title = document.getElementById('alert-title').value.trim();
+            const message = document.getElementById('alert-message').value.trim();
+            const duration = parseInt(document.getElementById('alert-duration').value) || 5;
+            const priority = document.getElementById('alert-priority').value;
+            const voice = document.getElementById('alert-voice').checked;
+
+            if (!title || !message) {
+                alert('⚠️ Please fill in title and message');
+                return;
+            }
+
+            showOutput('📤 Sending popup alert...');
+
+            fetch('/api/command/execute', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_id: selectedDevice,
+                    command: 'popup_alert',
+                    params: {
+                        title: title,
+                        message: message,
+                        duration: duration,
+                        priority: priority,
+                        voice: voice
+                    }
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showOutput(`✅ Alert sent successfully! (ID: ${data.command_id})`);
+                    // Clear form
+                    document.getElementById('alert-title').value = '';
+                    document.getElementById('alert-message').value = '';
+                    document.getElementById('alert-duration').value = '5';
+                    document.getElementById('alert-voice').checked = false;
+                } else {
+                    showOutput(`❌ Error: ${data.error || 'Failed to send alert'}`);
+                }
+            })
+            .catch(err => showOutput(`❌ Error: ${err.message}`));
+        }
+
+        function addTimeRestriction() {
+            if (!selectedDevice) {
+                alert('⚠️ Please select a device first');
+                return;
+            }
+
+            const type = document.getElementById('restriction-type').value;
+            const name = document.getElementById('restriction-name').value.trim();
+            const startTime = document.getElementById('restriction-start').value;
+            const endTime = document.getElementById('restriction-end').value;
+            const daysSelect = document.getElementById('restriction-days');
+            const days = Array.from(daysSelect.selectedOptions).map(o => parseInt(o.value));
+
+            if (!name || !startTime || !endTime || days.length === 0) {
+                alert('⚠️ Please fill in all fields and select at least one day');
+                return;
+            }
+
+            showOutput('📤 Adding time restriction...');
+
+            fetch('/api/time-restrictions', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_id: selectedDevice,
+                    type: type,
+                    name: name,
+                    days: days,
+                    start_time: startTime,
+                    end_time: endTime
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showOutput(`✅ Restriction added for ${name}`);
+                    // Clear form
+                    document.getElementById('restriction-name').value = '';
+                    document.getElementById('restriction-start').value = '';
+                    document.getElementById('restriction-end').value = '';
+                    Array.from(daysSelect.options).forEach(o => o.selected = false);
+                    // Reload restrictions
+                    loadTimeRestrictions();
+                } else {
+                    showOutput(`❌ Error: ${data.error || 'Failed to add restriction'}`);
+                }
+            })
+            .catch(err => showOutput(`❌ Error: ${err.message}`));
+        }
+
+        function loadTimeRestrictions() {
+            if (!selectedDevice) return;
+
+            fetch(`/api/time-restrictions/${selectedDevice}`)
+                .then(res => res.json())
+                .then(restrictions => {
+                    const container = document.getElementById('restrictions-list');
+                    if (restrictions.length === 0) {
+                        container.innerHTML = '<p style="color: #999; text-align: center; padding: 10px;">No time restrictions set</p>';
+                        return;
+                    }
+
+                    let html = '<div style="display: grid; gap: 8px;">';
+                    restrictions.forEach(r => {
+                        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                        const daysStr = r.days.map(d => dayNames[d]).join(', ');
+                        const timestamp = r.created_at ? new Date(r.created_at).toLocaleString() : 'No timestamp';
+                        html += `
+                            <div style="background: #f0f9ff; border-left: 3px solid #3b82f6; padding: 8px; border-radius: 4px; font-size: 13px;">
+                                <strong>${r.type === 'app' ? '🎮' : '🌐'} ${r.name}</strong><br>
+                                ⏰ ${r.start_time} - ${r.end_time}<br>
+                                📅 ${daysStr}<br>
+                                <span style="font-size: 10px; color: #666;">🕒 Created: ${timestamp}</span>
+                                <button onclick="deleteRestriction('${r._id}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; margin-top: 5px;">🗑️ Delete</button>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    container.innerHTML = html;
+                })
+                .catch(err => console.error('Error loading restrictions:', err));
+        }
+
+        function deleteRestriction(restrictionId) {
+            if (confirm('Are you sure you want to delete this restriction?')) {
+                fetch(`/api/time-restrictions/${restrictionId}`, {
+                    method: 'DELETE'
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        loadTimeRestrictions();
+                        showOutput('✅ Restriction deleted');
+                    }
+                })
+                .catch(err => showOutput(`❌ Error: ${err.message}`));
+            }
+        }
+
+        function loadAppUsage() {
+            if (!selectedDevice) return;
+
+            showOutput('📊 Loading app usage data...');
+
+            fetch(`/api/app-usage/${selectedDevice}`)
+                .then(res => res.json())
+                .then(usage => {
+                    const container = document.getElementById('app-usage-container');
+                    if (usage.length === 0) {
+                        container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No app usage data available yet</p>';
+                        return;
+                    }
+
+                    // Sort by duration
+                    usage.sort((a, b) => (b.duration || 0) - (a.duration || 0));
+
+                    let html = '<div style="display: grid; gap: 10px;">';
+                    let totalTime = 0;
+
+                    usage.slice(0, 10).forEach((item, idx) => {
+                        const duration = item.duration || 0;
+                        const minutes = Math.floor(duration / 60);
+                        const hours = Math.floor(minutes / 60);
+                        const mins = minutes % 60;
+                        const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+                        totalTime += duration;
+
+                        const percentage = Math.min((duration / 3600) * 100, 100); // Max 100%
+                        const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe', '#43e97b', '#fa709a', '#fee140', '#30b0fe', '#ec008c'];
+                        const color = colors[idx % colors.length];
+
+                        html += `
+                            <div style="background: #f5f5f5; border-radius: 5px; padding: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                    <strong style="font-size: 13px;">${item.app_name || item.process_name || 'Unknown'}</strong>
+                                    <span style="background: ${color}; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: bold;">${timeStr}</span>
+                                </div>
+                                <div style="background: #e5e5e5; border-radius: 3px; height: 6px; overflow: hidden;">
+                                    <div style="background: ${color}; height: 100%; width: ${percentage}%; border-radius: 3px;"></div>
+                                </div>
+                                <div style="font-size: 10px; color: #666; margin-top: 5px;">
+                                    📅 ${item.created_at ? new Date(item.created_at).toLocaleString() : 'No timestamp'}
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    const totalHours = Math.floor(totalTime / 3600);
+                    const totalMins = Math.floor((totalTime % 3600) / 60);
+                    html += `
+                        <div style="background: #dcfce7; border-radius: 3px; padding: 6px; text-align: center; margin-top: 5px; border-left: 2px solid #4ade80; font-size: 11px;">
+                            <strong>Total Screen Time (Top 10):</strong> ${totalHours}h ${totalMins}m
+                        </div>
+                    `;
+
+                    html += '</div>';
+                    container.innerHTML = html;
+                    showOutput('✅ App usage loaded');
+                })
+                .catch(err => showOutput(`❌ Error: ${err.message}`));
+        }
+
+        // Auto refresh advanced data when tab is selected
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            // Load advanced data when tabs are selected
+            if (tabName === 'advanced') {
+                loadTimeRestrictions();
+                loadAppUsage();
+            } else if (tabName === 'command-history') {
+                loadCommandHistory();
+            }
+        }
+
+        // Auto-refresh location every 5 minutes if visible
+        setInterval(() => {
+            const locationDisplay = document.getElementById('location-display');
+            if (selectedDevice && locationDisplay.style.display === 'block') {
+                showLocation();
+            }
+        }, 300000); // 5 minutes
+
+        // Refresh data every 15 seconds
+        setInterval(() => {
+            if (selectedDevice) {
+                loadScreenshots();
+                loadKeystrokes();
+                loadHistory();
+            }
+        }, 15000);
+    </script>
+</body>
+</html>

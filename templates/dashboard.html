@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParentEye Pro - Advanced Monitoring Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        /* ========== HEADER ========== */
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-left h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .header-left p {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+
+        /* ========== USER PROFILE ========== */
+        .profile-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .profile-avatar {
+            width: 45px;
+            height: 45px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .profile-info h3 {
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .profile-info p {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        .btn-logout {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-logout:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);
+        }
+
+        /* ========== MAIN CONTAINER ========== */
+        .container {
+            max-width: 1600px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        /* ========== DEVICE CARDS ========== */
+        .device-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .device-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            color: white;
+            border: 3px solid transparent;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .device-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .device-card.selected {
+            border-color: #fbbf24;
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+
+        .device-card h4 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .device-card p {
+            margin: 5px 0;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .device-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .device-status.online {
+            background: rgba(74, 222, 128, 0.3);
+            color: #86efac;
+        }
+
+        .device-status.offline {
+            background: rgba(248, 113, 113, 0.3);
+            color: #fca5a5;
+        }
+
+        /* ========== TABS ========== */
+        .tabs-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+        }
+
+        .tabs-header {
+            display: flex;
+            background: linear-gradient(90deg, #f997f9 0%, #667eea 100%);
+            padding: 0;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 18px 20px;
+            background: none;
+            border: none;
+            color: white;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            box-shadow: none;
+        }
+
+        .tab-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .tab-btn.active {
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: inset 0 -3px 0 white;
+        }
+
+        /* ========== TAB CONTENT ========== */
+        .tabs-content {
+            padding: 30px;
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ========== SECTION GRID ========== */
+        .section-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+
+        .section-box {
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .section-box h3 {
+            color: #1e3c72;
+            font-size: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* ========== CONTROLS GRID ========== */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(74, 222, 128, 0.4);
+        }
+
+        /* ========== INPUT FIELDS ========== */
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        select {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* ========== LOCATION DISPLAY ========== */
+        #location-display {
+            background: linear-gradient(135deg, #e0e7ff 0%, #fce7f3 100%);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 2px dashed #667eea;
+        }
+
+        .location-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        .location-item {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+
+        .location-item strong {
+            color: #1e3c72;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        /* ========== OUTPUT SECTION ========== */
+        .output-box {
+            background: #1e293b;
+            color: #22c55e;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+            min-height: 150px;
+        }
+
+        /* ========== MODAL VIEWER ========== */
+        .media-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .media-modal.active {
+            display: flex;
+        }
+
+        .media-modal-content {
+            background: #0f172a;
+            color: #e2e8f0;
+            width: 100%;
+            max-width: 1200px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+            overflow: hidden;
+        }
+
+        .media-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: #111827;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .media-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .media-modal-close {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .media-modal-body {
+            padding: 20px;
+            background: #0b1220;
+        }
+
+        .media-modal-body img,
+        .media-modal-body iframe {
+            width: 100%;
+            max-height: 70vh;
+            object-fit: contain;
+            border-radius: 10px;
+            background: #020617;
+        }
+
+        .media-modal-details {
+            margin-top: 12px;
+            font-size: 13px;
+            color: #cbd5f5;
+            line-height: 1.6;
+        }
+
+        /* ========== DEVICE OFFLINE WARNING ========== */
+        .offline-warning {
+            background: #fef2f2;
+            border: 2px solid #fca5a5;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        /* ========== SCROLLBAR ========== */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* ========== RESPONSIVE ========== */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 20px;
+                align-items: flex-start;
+            }
+
+            .header-right {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .section-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .location-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .controls-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ========== HEADER ========== -->
+    <div class="header">
+        <div class="header-left">
+            <h1>🔐 ParentEye Pro</h1>
+            <p>Advanced Device Monitoring Dashboard</p>
+        </div>
+        <div class="header-right">
+            <div class="profile-section">
+                <div class="profile-avatar" id="profileAvatar">P</div>
+                <div class="profile-info">
+                    <h3 id="profileName">Parent User</h3>
+                    <p id="profileRole">Admin</p>
+                </div>
+            </div>
+            <a href="/logout" class="btn-logout">🚪 Logout</a>
+        </div>
+    </div>
+
+    <!-- ========== MAIN CONTAINER ========== -->
+    <div class="container">
+        <!-- Device Selector -->
+        <div class="device-selector">
+            <h2>📱 Select Monitored Device</h2>
+            <div id="device-cards" class="device-cards"></div>
+        </div>
+
+        <!-- Offline Warning -->
+        <div id="offline-warning" class="offline-warning" style="display: none;">
+            ⚠️ Selected device is offline. Last update: <span id="last-update"></span>
+        </div>
+
+        <!-- Tabs Container -->
+        <div class="tabs-container">
+            <!-- Tab Headers -->
+            <div class="tabs-header">
+                <button class="tab-btn active" onclick="switchTab('monitoring')">
+                    📊 Monitoring Dashboard
+                </button>
+                <button class="tab-btn" onclick="switchTab('advanced')">
+                    🔧 Advanced Controls
+                </button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="tabs-content">
+                <!-- ========== TAB 1: MONITORING ========== -->
+                <div id="monitoring" class="tab-pane active">
+                    <div class="section-grid">
+                        <!-- Monitor Commands -->
+                        <div class="section-box" style="border-left-color: #4f46e5;">
+                            <h3>📸 Screen & Activity Monitoring</h3>
+                            <div class="controls-grid">
+                                <button class="btn-primary" onclick="requestMedia('screenshot', 'Screenshot')">📸 Screenshot</button>
+                                <button class="btn-primary" onclick="requestMedia('webcam', 'Webcam')">📷 Webcam</button>
+                                <button class="btn-primary" onclick="loadHistory()">🌐 History</button>
+                            </div>
+                            <div id="monitoring-output" class="output-box">Ready...</div>
+                        </div>
+
+                        <!-- Keystroke Monitoring -->
+                        <div class="section-box" style="border-left-color: #8b5cf6;">
+                            <h3>⌨️ Keystroke & Location</h3>
+                            <button class="btn-primary" style="width: 100%; margin-bottom: 15px;">✅ Keystroke Monitoring: ACTIVE</button>
+                            <div style="margin-top: 15px;">
+                                <button class="btn-success" onclick="refreshKeystroke()" style="width: 100%; margin-bottom: 10px;">🔄 Refresh Keystrokes</button>
+                                <div id="keystroke-output" class="output-box">Waiting for keystrokes...</div>
+                            </div>
+                        </div>
+
+                        <!-- Location Tracking (Full Width) -->
+                        <div class="section-box" style="grid-column: 1 / -1; border-left-color: #06b6d4;">
+                            <h3>📍 Live Location Tracking</h3>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn-primary" onclick="showLocation()" style="flex: 1;">📍 Show Location</button>
+                                <button class="btn-success" onclick="refreshLocation()" style="flex: 1;">🔄 Refresh Location</button>
+                            </div>
+                            <div id="location-display" style="display: none; margin-top: 15px;"></div>
+                            <div id="map-container" style="width: 100%; height: 300px; margin-top: 15px; border-radius: 8px; overflow: hidden; display: none;">
+                                <iframe id="location-map" width="100%" height="100%" style="border: none;"></iframe>
+                            </div>
+                            <button class="btn-primary" onclick="openLocationModal()" style="width: 100%; margin-top: 12px;">🧭 Open Full Map</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== TAB 2: ADVANCED CONTROLS ========== -->
+                <div id="advanced" class="tab-pane">
+                    <div class="section-grid">
+                        <!-- Website Blocking -->
+                        <div class="section-box" style="border-left-color: #ef4444;">
+                            <h3>🌐 Website Blocking</h3>
+                            <div class="input-group">
+                                <input type="text" id="website-input" placeholder="facebook.com, youtube.com">
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn-danger" onclick="blockWebsites()" style="flex: 1;">🚫 Block</button>
+                                <button class="btn-success" onclick="unblockWebsites()" style="flex: 1;">✅ Unblock</button>
+                            </div>
+                            <div id="website-output" class="output-box" style="margin-top: 15px;">Ready...</div>
+                        </div>
+
+                        <!-- Application Blocking -->
+                        <div class="section-box" style="border-left-color: #f59e0b;">
+                            <h3>🎮 Application Blocking</h3>
+                            <div class="input-group">
+                                <input type="text" id="exe-input" placeholder="discord, chrome, fortnite">
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn-danger" onclick="blockExe()" style="flex: 1;">🚫 Block</button>
+                                <button class="btn-success" onclick="unblockExe()" style="flex: 1;">✅ Unblock</button>
+                            </div>
+                            <div id="exe-output" class="output-box" style="margin-top: 15px;">Ready...</div>
+                        </div>
+
+                        <!-- Dangerous Commands -->
+                        <div class="section-box" style="border-left-color: #dc2626; grid-column: 1 / -1;">
+                            <h3>⚠️ Dangerous Commands (Use with Caution)</h3>
+                            <div class="controls-grid">
+                                <button class="btn-primary" onclick="executeCommand('lock')">🔒 Lock PC</button>
+                                <button class="btn-warning" onclick="executeCommand('logout')">🚪 Logout</button>
+                                <button class="btn-danger" onclick="executeCommand('restart')">🔄 Restart</button>
+                                <button class="btn-danger" onclick="executeCommand('shutdown')">⚠️ Shutdown</button>
+                            </div>
+                            <div id="dangerous-output" class="output-box" style="margin-top: 15px;">Ready...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== BIG SCREEN MODAL ========== -->
+    <div id="media-modal" class="media-modal" onclick="closeModal(event)">
+        <div class="media-modal-content" onclick="event.stopPropagation()">
+            <div class="media-modal-header">
+                <div class="media-modal-title" id="media-modal-title">Viewer</div>
+                <button class="media-modal-close" onclick="closeModal(event)">Close</button>
+            </div>
+            <div class="media-modal-body" id="media-modal-body">
+                Loading...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedDevice = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateProfileInfo();
+            loadDevices();
+            setupAutoRefresh();
+        });
+
+        // Update profile info from backend
+        function updateProfileInfo() {
+            fetch('/api/user/profile')
+                .then(res => res.json())
+                .then(user => {
+                    const profileName = user.username || 'Parent User';
+                    const profileRole = user.role || 'Admin';
+                    const initials = profileName.substring(0, 2).toUpperCase();
+                    
+                    document.getElementById('profileName').textContent = profileName;
+                    document.getElementById('profileRole').textContent = profileRole;
+                    document.getElementById('profileAvatar').textContent = initials;
+                    
+                    // Store in localStorage for reference
+                    localStorage.setItem('username', profileName);
+                    localStorage.setItem('userRole', profileRole);
+                })
+                .catch(err => console.error('Failed to load profile:', err));
+        }
+
+        // Load devices as cards
+        function loadDevices() {
+            fetch('/api/devices')
+                .then(res => res.json())
+                .then(devices => {
+                    const cardsContainer = document.getElementById('device-cards');
+                    cardsContainer.innerHTML = '';
+                    
+                    if (devices.length === 0) {
+                        cardsContainer.innerHTML = '<p style="color: #999;">No devices registered yet</p>';
+                        return;
+                    }
+                    
+                    devices.forEach(device => {
+                        const isOnline = device.status === 'online';
+                        const statusBadge = isOnline ? '🟢 Online' : '🔴 Offline';
+                        const card = document.createElement('div');
+                        card.className = `device-card ${selectedDevice === device.device_id ? 'selected' : ''}`;
+                        card.onclick = () => selectDevice(device.device_id);
+                        card.innerHTML = `
+                            <h4>${device.device_name}</h4>
+                            <p><strong>ID:</strong> ${device.device_id}</p>
+                            <p><strong>Parent:</strong> ${device.parent_name || 'Unassigned'}</p>
+                            <span class="device-status ${isOnline ? 'online' : 'offline'}">${statusBadge}</span>
+                        `;
+                        cardsContainer.appendChild(card);
+                    });
+                })
+                .catch(err => console.error('Failed to load devices:', err));
+        }
+
+        // Setup auto-refresh
+        function setupAutoRefresh() {
+            // Refresh devices every 30 seconds
+            setInterval(loadDevices, 30000);
+            
+            // Auto-refresh keystrokes if device selected
+            setInterval(() => {
+                if (selectedDevice && document.getElementById('monitoring').classList.contains('active')) {
+                    refreshKeystroke();
+                }
+            }, 15000);
+        }
+
+        // Switch tabs
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-pane').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Select device
+        function selectDevice(deviceId) {
+            selectedDevice = deviceId;
+            if (!selectedDevice) {
+                alert('Please select a device');
+                return;
+            }
+            // Reload cards to show selected state
+            loadDevices();
+        }
+
+        // Show location
+        function showLocation() {
+            if (!selectedDevice) {
+                alert('Please select a device first');
+                return;
+            }
+            
+            fetch(`/api/location/${selectedDevice}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data) {
+                        const loc = data.location ? data.location : data;
+                        let html = '<div class="location-grid">';
+                        html += `<div class="location-item"><strong>🏙️ City:</strong> ${loc.city || 'N/A'}</div>`;
+                        html += `<div class="location-item"><strong>📍 Region:</strong> ${loc.region || loc.state || 'N/A'}</div>`;
+                        html += `<div class="location-item"><strong>🌍 Country:</strong> ${loc.country || 'N/A'}</div>`;
+                        html += `<div class="location-item"><strong>📮 ZIP:</strong> ${loc.zip || 'N/A'}</div>`;
+                        html += `<div class="location-item"><strong>🛰️ ISP:</strong> ${loc.isp || 'N/A'}</div>`;
+                        html += `<div class="location-item"><strong>🕒 Timezone:</strong> ${loc.timezone || 'N/A'}</div>`;
+                        if (loc.ip) html += `<div class="location-item"><strong>🌐 IP:</strong> ${loc.ip}</div>`;
+                        if (loc.lat && loc.lon) {
+                            html += `<div class="location-item"><strong>📍 Latitude:</strong> ${loc.lat}</div>`;
+                            html += `<div class="location-item"><strong>📍 Longitude:</strong> ${loc.lon}</div>`;
+                        }
+                        html += `</div>`;
+                        document.getElementById('location-display').innerHTML = html;
+                        document.getElementById('location-display').style.display = 'block';
+                        
+                        // Show map if coordinates available
+                        if (loc.lat && loc.lon) {
+                            const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${loc.lon-0.01},${loc.lat-0.01},${loc.lon+0.01},${loc.lat+0.01}&layer=mapnik&marker=${loc.lat},${loc.lon}`;
+                            document.getElementById('location-map').src = mapUrl;
+                            document.getElementById('map-container').style.display = 'block';
+                        }
+                    } else {
+                        document.getElementById('location-display').innerHTML = '<p>No location data available</p>';
+                        document.getElementById('location-display').style.display = 'block';
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('location-display').innerHTML = '<p>Error fetching location</p>';
+                    document.getElementById('location-display').style.display = 'block';
+                });
+        }
+
+        function refreshLocation() {
+            showLocation();
+        }
+
+        function openLocationModal() {
+            if (!selectedDevice) return alert('Select device first');
+            fetch(`/api/location/${selectedDevice}`)
+                .then(res => res.json())
+                .then(data => {
+                    const loc = data.location ? data.location : data;
+                    const mapUrl = (loc.lat && loc.lon)
+                        ? `https://www.openstreetmap.org/export/embed.html?bbox=${loc.lon-0.02},${loc.lat-0.02},${loc.lon+0.02},${loc.lat+0.02}&layer=mapnik&marker=${loc.lat},${loc.lon}`
+                        : '';
+                    const details = `
+                        <div class="media-modal-details">
+                            <div><strong>City:</strong> ${loc.city || 'N/A'}</div>
+                            <div><strong>Region:</strong> ${loc.region || loc.state || 'N/A'}</div>
+                            <div><strong>Country:</strong> ${loc.country || 'N/A'}</div>
+                            <div><strong>ZIP:</strong> ${loc.zip || 'N/A'}</div>
+                            <div><strong>ISP:</strong> ${loc.isp || 'N/A'}</div>
+                            <div><strong>Timezone:</strong> ${loc.timezone || 'N/A'}</div>
+                            <div><strong>IP:</strong> ${loc.ip || 'N/A'}</div>
+                            <div><strong>Lat/Lon:</strong> ${loc.lat || 'N/A'}, ${loc.lon || 'N/A'}</div>
+                        </div>
+                    `;
+                    const content = mapUrl
+                        ? `<iframe src="${mapUrl}" style="width:100%;height:70vh;border:none;"></iframe>${details}`
+                        : `<div class="media-modal-details">No coordinates available.</div>${details}`;
+                    openModal('Live Location - Big Screen', content);
+                })
+                .catch(() => openModal('Live Location - Big Screen', '<div class="media-modal-details">Unable to load location.</div>'));
+        }
+
+        function refreshKeystroke() {
+            if (!selectedDevice) return;
+            
+            fetch(`/api/keystrokes/${selectedDevice}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (Array.isArray(data) && data.length > 0) {
+                        const output = data.map(k => k.text).reverse().join(' ');
+                        document.getElementById('keystroke-output').textContent = output;
+                    } else {
+                        document.getElementById('keystroke-output').textContent = 'No keystrokes captured yet...';
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('keystroke-output').textContent = 'Error loading keystrokes...';
+                });
+        }
+
+        function blockWebsites() {
+            if (!selectedDevice) return alert('Select device first');
+            const websites = document.getElementById('website-input').value.split(',').map(w => w.trim()).filter(w => w);
+            
+            if (websites.length === 0) return alert('Enter at least one website');
+            
+            let completed = 0;
+            const outputDiv = document.getElementById('website-output');
+            outputDiv.textContent = `📤 Blocking ${websites.length} website(s)...`;
+            
+            websites.forEach(site => {
+                fetch('/api/command/block-site', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({device_id: selectedDevice, site: site})
+                })
+                .then(res => res.json())
+                .then(data => {
+                    completed++;
+                    if (data.command_id) {
+                        outputDiv.textContent = `🕒 Queued (${completed}/${websites.length}): ${websites.slice(0, completed).join(', ')}`;
+                    }
+                    if (completed === websites.length) {
+                        pollResult('block_site', 'website-output', 10);
+                        document.getElementById('website-input').value = '';
+                    }
+                })
+                .catch(err => {
+                    outputDiv.textContent = `❌ Error blocking ${site}: ${err}`;
+                });
+            });
+        }
+
+        function unblockWebsites() {
+            if (!selectedDevice) return alert('Select device first');
+            const websites = document.getElementById('website-input').value.split(',').map(w => w.trim()).filter(w => w);
+            
+            if (websites.length === 0) return alert('Enter at least one website');
+            
+            let completed = 0;
+            const outputDiv = document.getElementById('website-output');
+            outputDiv.textContent = `📤 Unblocking ${websites.length} website(s)...`;
+            
+            websites.forEach(site => {
+                fetch('/api/command/unblock-site', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({device_id: selectedDevice, site: site})
+                })
+                .then(res => res.json())
+                .then(data => {
+                    completed++;
+                    if (data.command_id) {
+                        outputDiv.textContent = `🕒 Queued (${completed}/${websites.length}): ${websites.slice(0, completed).join(', ')}`;
+                    }
+                    if (completed === websites.length) {
+                        pollResult('unblock_site', 'website-output', 10);
+                        document.getElementById('website-input').value = '';
+                    }
+                })
+                .catch(err => {
+                    outputDiv.textContent = `❌ Error unblocking ${site}: ${err}`;
+                });
+            });
+        }
+
+        function blockExe() {
+            if (!selectedDevice) return alert('Select device first');
+            const exe = document.getElementById('exe-input').value.trim();
+            
+            if (!exe) return alert('Enter application name');
+            
+            fetch('/api/command/block-app', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({device_id: selectedDevice, app_name: exe})
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('exe-output').textContent = `🕒 Command queued: ${exe}`;
+                document.getElementById('exe-input').value = '';
+                pollResult('block_app', 'exe-output', 10);
+            })
+            .catch(err => {
+                document.getElementById('exe-output').textContent = `❌ Error: ${err}`;
+            });
+        }
+
+        function unblockExe() {
+            if (!selectedDevice) return alert('Select device first');
+            const exe = document.getElementById('exe-input').value.trim();
+            
+            if (!exe) return alert('Enter application name');
+            
+            fetch('/api/command/unblock-app', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({device_id: selectedDevice, app_name: exe})
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('exe-output').textContent = `🕒 Command queued: ${exe}`;
+                document.getElementById('exe-input').value = '';
+                pollResult('unblock_app', 'exe-output', 10);
+            })
+            .catch(err => {
+                document.getElementById('exe-output').textContent = `❌ Error: ${err}`;
+            });
+        }
+
+        function executeCommand(cmd) {
+            if (!selectedDevice) return alert('Select device first');
+            
+            // Show confirmation for dangerous commands
+            if (['shutdown', 'restart', 'logout'].includes(cmd)) {
+                if (!confirm(`⚠️ Are you sure you want to ${cmd} the selected device?`)) {
+                    return;
+                }
+            }
+            
+            fetch('/api/command/execute', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({device_id: selectedDevice, command: cmd})
+            })
+            .then(res => res.json())
+            .then(data => {
+                const output = `✅ Command '${cmd}' sent to device`;
+                document.getElementById('dangerous-output').textContent = output;
+            })
+            .catch(err => {
+                document.getElementById('dangerous-output').textContent = `❌ Error: ${err}`;
+            });
+        }
+
+        function requestMedia(mediaType, label) {
+            if (!selectedDevice) return alert('Select device first');
+            openModal(`${label} - Big Screen`, '<div class="media-modal-details">Preparing media...</div>');
+
+            fetch('/api/command/execute', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({device_id: selectedDevice, command: mediaType})
+            })
+            .then(res => res.json())
+            .then(() => pollMedia(mediaType, label, 10))
+            .catch(err => {
+                openModal(`${label} - Big Screen`, `<div class="media-modal-details">Error: ${err}</div>`);
+            });
+        }
+
+        function pollMedia(mediaType, label, attemptsLeft) {
+            fetch(`/api/media/${selectedDevice}?type=${mediaType}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.image_base64) {
+                        const imgTag = `<img src="data:image/${mediaType === 'webcam' ? 'jpeg' : 'png'};base64,${data.image_base64}" alt="${label}" />`;
+                        const details = `<div class="media-modal-details">Captured: ${data.created_at || 'Just now'}</div>`;
+                        openModal(`${label} - Big Screen`, imgTag + details);
+                        return;
+                    }
+                    if (attemptsLeft > 0) {
+                        setTimeout(() => pollMedia(mediaType, label, attemptsLeft - 1), 1500);
+                    } else {
+                        openModal(`${label} - Big Screen`, '<div class="media-modal-details">No media available yet. Try again.</div>');
+                    }
+                })
+                .catch(() => {
+                    if (attemptsLeft > 0) {
+                        setTimeout(() => pollMedia(mediaType, label, attemptsLeft - 1), 1500);
+                    } else {
+                        openModal(`${label} - Big Screen`, '<div class="media-modal-details">Unable to load media.</div>');
+                    }
+                });
+        }
+
+        function loadHistory() {
+            if (!selectedDevice) return alert('Select device first');
+            openModal('Browser History - Big Screen', '<div class="media-modal-details">Preparing history...</div>');
+
+            fetch('/api/command/execute', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({device_id: selectedDevice, command: 'chromehistory'})
+            })
+            .then(() => pollHistory(10))
+            .catch(err => {
+                openModal('Browser History - Big Screen', `<div class="media-modal-details">Error: ${err}</div>`);
+            });
+        }
+
+        function pollHistory(attemptsLeft) {
+            fetch(`/api/history/${selectedDevice}`)
+                .then(res => res.json())
+                .then(history => {
+                    if (Array.isArray(history) && history.length > 0) {
+                        const list = history.map(h => `<div>• ${h.title || h.url}</div>`).join('');
+                        openModal('Browser History - Big Screen', `<div class="media-modal-details">${list}</div>`);
+                    } else if (attemptsLeft > 0) {
+                        setTimeout(() => pollHistory(attemptsLeft - 1), 1500);
+                    } else {
+                        openModal('Browser History - Big Screen', '<div class="media-modal-details">No history available yet. Try again.</div>');
+                    }
+                })
+                .catch(() => {
+                    if (attemptsLeft > 0) {
+                        setTimeout(() => pollHistory(attemptsLeft - 1), 1500);
+                    } else {
+                        openModal('Browser History - Big Screen', '<div class="media-modal-details">Unable to load history.</div>');
+                    }
+                });
+        }
+
+        function pollResult(command, outputId, attemptsLeft) {
+            fetch(`/api/results/${selectedDevice}?command=${command}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.data) {
+                        const message = data.data.message || JSON.stringify(data.data);
+                        document.getElementById(outputId).textContent = data.success
+                            ? `✅ ${message}`
+                            : `❌ ${message}`;
+                    } else if (attemptsLeft > 0) {
+                        setTimeout(() => pollResult(command, outputId, attemptsLeft - 1), 1500);
+                    } else {
+                        document.getElementById(outputId).textContent = '⚠️ No response yet. Ensure client is running as admin.';
+                    }
+                })
+                .catch(() => {
+                    if (attemptsLeft > 0) {
+                        setTimeout(() => pollResult(command, outputId, attemptsLeft - 1), 1500);
+                    } else {
+                        document.getElementById(outputId).textContent = '⚠️ No response yet. Ensure client is running as admin.';
+                    }
+                });
+        }
+
+        function openModal(title, contentHtml) {
+            document.getElementById('media-modal-title').textContent = title;
+            document.getElementById('media-modal-body').innerHTML = contentHtml;
+            document.getElementById('media-modal').classList.add('active');
+        }
+
+        function closeModal(event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            document.getElementById('media-modal').classList.remove('active');
+        }
+    </script>
+</body>
+</html>
