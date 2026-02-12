@@ -1,0 +1,23 @@
+ParentEye - Advantages
+
+Technical Advantages
+- Three-tier architecture (dashboard, backend, client agent) scales cleanly.
+- Cloud-ready data layer (MongoDB Atlas) with optional local fallback.
+- Command queue with polling tolerates intermittent connectivity.
+- Agent-side enforcement (hosts file + process kill) works even if dashboard is offline.
+- Strong auditability: commands, results, screenshots, keystrokes are timestamped and stored.
+- Flexible deployment: run as Python for dev, single EXE for production.
+- Lightweight client: minimal open ports, outbound-only communication.
+
+Product Advantages
+- Single dashboard controls multiple devices from anywhere.
+- Live control + passive monitoring in one workflow.
+- Multi-parent management with device assignment.
+- Quick onboarding via setup wizard and batch tools.
+- Supports both LAN home setup and remote cloud access.
+
+Business / Market Advantages
+- End-to-end system in one repo reduces cost and time to launch.
+- Modular design enables easy feature expansion (alerts, reports, policies).
+- Works for home users, schools, or small institutions.
+- Low infrastructure overhead (Flask + MongoDB).

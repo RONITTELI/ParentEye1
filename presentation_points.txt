@@ -1,0 +1,78 @@
+ParentEye - Presentation Points
+
+1) Problem + Value
+- Centralized parental control for multiple child devices.
+- Web dashboard for monitoring, policy control, and alerts.
+- Cloud data storage for access from anywhere.
+
+2) Core Features (from codebase)
+- Web dashboard (Flask) for real-time device monitoring and control.
+- Device registration and assignment to parents (admin panel).
+- Remote commands: screenshot, webcam capture, screen recording, lock, logout, restart, shutdown.
+- Keylogger with buffered auto-save and MongoDB storage.
+- Website blocking/unblocking by hosts file (admin rights required on client).
+- Application blocking via process monitor and kill list.
+- Chrome history capture and browser/app usage tracking.
+- Location tracking via IP geolocation and backend location endpoint.
+- Daily summaries stored in MongoDB for analytics/insights.
+- Build as EXE for easy deployment on child PCs.
+
+3) Tech Stack
+- Backend: Python + Flask (REST endpoints + HTML templates).
+- Database: MongoDB (Atlas or local) with collections for devices, commands, results, screenshots, keystrokes.
+- Client: Python agent with system APIs (psutil, pynput, pyautogui, OpenCV, mss, imageio).
+- Config: .env + interactive setup wizard (config_client.py).
+- Packaging: PyInstaller for EXE distribution.
+
+4) Technical Advantages
+- Decoupled architecture (web UI, backend, client agent) for scalability.
+- Cloud-first storage (MongoDB Atlas) enables remote access from any location.
+- Command queue pattern with polling provides reliable execution even with unstable connectivity.
+- Fine-grained collections for fast queries (devices/commands/results/screenshots/keystrokes).
+- Admin and parent roles with device assignment for multi-family use cases.
+
+5) Uniqueness / Differentiators
+- End-to-end stack in one repo: backend + client + UI + deployment scripts.
+- Supports both LAN and cloud deployment with minimal config changes.
+- Live control commands combined with passive monitoring (keylogs, history, usage).
+- Setup wizard + batch scripts reduce onboarding friction.
+- Transitioned from chatbot to full web dashboard for richer control.
+- Device ownership model: claim/assign devices to parents (admin-managed).
+- Dual-channel security: web session auth for parents, separate client APIs for devices.
+- Offline-tolerant design: command queue + polling avoids inbound firewall rules on child PCs.
+- Agent-level enforcement: hosts file and process monitoring enforce limits locally.
+- Built-in audit trail: commands, results, and artifacts stored with timestamps in MongoDB.
+- Deployment flexibility: run as Python script during dev, or single EXE for distribution.
+
+6) Data Flow (High Level)
+- Parent dashboard sends a command -> Flask API -> MongoDB "commands" collection.
+- Client polls backend for pending commands -> executes -> posts results.
+- Client also pushes telemetry (keystrokes, screenshots, usage, location).
+- Dashboard reads from MongoDB and renders device state + reports.
+
+7) Data Flow (Step-by-step)
+- Client starts, loads .env, registers device with backend.
+- Backend stores device info (status, system info, timestamps).
+- Parent selects device in dashboard and triggers actions.
+- Backend inserts a pending command document.
+- Client polls /api/commands/pending and executes command.
+- Client sends /api/command/result with outputs.
+- Backend stores results and dashboard refreshes views.
+
+8) Security / Access
+- Session-based login for web dashboard.
+- Admin-only APIs for parent/device management.
+- Client endpoints are separated from web session auth.
+- Environment variables keep secrets out of code.
+
+9) Scalability Notes
+- Multiple child devices, multiple parents, centralized database.
+- Stateless backend with MongoDB storage fits cloud hosting.
+- Client agent works offline and syncs when available.
+
+10) Demo Flow (Suggested)
+- Show login + admin panel.
+- Register/assign device.
+- Trigger screenshot or lock command.
+- Show result stored and visible in dashboard.
+- Show reports (keystrokes/history/usage).
